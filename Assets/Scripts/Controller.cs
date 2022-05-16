@@ -4,51 +4,83 @@ using UnityEngine;
 
 public class Controller : MonoBehaviour
 {
+    #region Settings and References
     public Transform cameraTansform;
     public Transform player;
-    public float cameraFallSpeed = 1;
-    public float speedNearBottomFactor = 2;
-    public float speedIncreaseRate = 0.01f;
-    public float levelBottom = 5;
-    public float levelSide = 3;
-    public float deathHeight = 7;
+    public AnimationCurve cameraSpeedCurve = new AnimationCurve();
+    public float musicBeatRate = 0.25f;
+    public float firstBeat = 0.5f;
+    public int beatsPerAction = 4;
+    public float gridScale = 0.5f;
 
-    public int numBlocksAcross = 11;
-    public int startNumRows = 25;
-    public int maxExtraRows = 3;
-    public float blockSize = 0.5f;
-    public int maxHorPath = 3;
     public GameObject defaultTile;
 
     public List<GameObject> tilePrefabs = new List<GameObject>();
-    
+    #endregion
+
+    #region Controller Variables
     private List<SimpleTile>[] sortedTiles = new List<SimpleTile>[4];
-
-    private List<Transform[]> _rows = new List<Transform[]>();
-    private List<bool[]> usedCells = new List<bool[]>();
-    private float levelWidth = 20;
-
-
-    private float _offset = 0;
-    private int _startPathX = 1;
-    private int _endPathX = 1;
-    private int _nextY = 0;
+    
     private bool playerDead = false;
+    private float nextBeat = 0;
+    private int numBeats = 0;
+    private AudioSource musicPlayer;
 
-    //Simple Tile Generation:
     private List<Tile[]> generatedTiles = new List<Tile[]>();
     private List<Vector2> downConnections = new List<Vector2>();
+    #endregion
 
+    #region Unity Events
     // Start is called before the first frame update
     void Start()
     {
-        _offset = (numBlocksAcross / 2) * blockSize;
-        _startPathX = Random.Range(1, numBlocksAcross - 1);
-        _endPathX = _startPathX;
         SortTilePrefabs();
-        //GenerateStartingMaze();
         GenerateStartingTiles();
+        musicPlayer = GetComponent<AudioSource>();
+        nextBeat = firstBeat;
     }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (!musicPlayer.isPlaying && Time.time >= firstBeat)
+            musicPlayer.Play();
+
+        if (Time.time >= nextBeat)
+        {
+            nextBeat += musicBeatRate;
+            numBeats += 1;
+            if (beatsPerAction != 0 && numBeats % beatsPerAction == 0)
+            {
+                Vector3 movement = Vector3.zero;
+                if (Input.GetKey(KeyCode.W))
+                    movement += new Vector3(0, gridScale);
+                else if (Input.GetKey(KeyCode.S))
+                    movement += new Vector3(0, -gridScale);
+                else if (Input.GetKey(KeyCode.D))
+                    movement += new Vector3(gridScale, 0);
+                else if (Input.GetKey(KeyCode.A))
+                    movement += new Vector3(-gridScale, 0);
+
+                if (!Physics2D.OverlapPoint(player.position + movement))
+                    player.position += movement;
+            }
+        }
+        MoveCameraToPlayer();
+    }
+
+    private void OnDrawGizmos()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireCube(cameraTansform.position - new Vector3(0, levelBottom), Vector3.forward + Vector3.right);
+        Gizmos.DrawWireCube(cameraTansform.position + new Vector3(levelSide, 0), Vector3.forward + Vector3.up);
+        Gizmos.DrawWireCube(cameraTansform.position - new Vector3(levelSide, 0), Vector3.forward + Vector3.up);
+    }
+    #endregion
+
+    #region Tiles and Chunks
+    private List<Chunk> chunks = new List<Chunk>();
+    private int numChunks = 0;
 
     private void SortTilePrefabs()
     {
@@ -66,68 +98,15 @@ public class Controller : MonoBehaviour
                     sortedTiles[i].Add(tile);
             }
         }
-        /*
-        for (int i = 0; i < 4; ++i)
-        {
-            foreach (SimpleTile tile in sortedTiles[i])
-                Debug.Log(tile.name + " is in the " + (Dir)i + " list.");
-        }
-        */
-    }
-
-    private void GenerateStartingMaze()
-    {
-        for (int y = 0; y < startNumRows; ++y)
-        {
-            GenerateRow();
-        }
-    }
-
-    private void GenerateRow()
-    {
-        Transform[] blocks = new Transform[numBlocksAcross + 1];
-
-        blocks[0] = new GameObject("Row " + _nextY).transform;
-        blocks[0].position = new Vector2(0, -_nextY * blockSize);
-        blocks[0].SetParent(transform);
-        
-        for (int x = 0; x < numBlocksAcross; ++x)
-        {
-            if (x.Outside(_startPathX, _endPathX) && Random.value > 0.2f)
-                blocks[x + 1] = (Instantiate(defaultTile, new Vector2(x * blockSize - _offset, -_nextY * blockSize), Quaternion.identity, blocks[0]).transform);
-        }
-
-        _rows.Add(blocks);
-
-        DeleteExtraRow();
-
-        _startPathX = _endPathX;
-        _endPathX += Random.Range(-maxHorPath, maxHorPath);
-        _endPathX = Mathf.Clamp(_endPathX, 1, numBlocksAcross - 1);
-
-        _nextY += 1;
     }
     
     private void GenerateStartingTiles()
     {
         GenerateTileChunk();
-
-        foreach (Chunk c in chunks)
-            Debug.Log(c.endSlot);
-
         GenerateTileChunk();
 
-        foreach (Chunk c in chunks)
-            Debug.Log(c.endSlot);
-
-        for (int y = 0; y < startNumRows; ++y)
-        {
-            //GenerateTileChunk();
-        }
+        player.position = chunks[0].slots[chunks[0].startSlot.x, chunks[0].startSlot.y].transform.position;
     }
-
-    private List<Chunk> chunks = new List<Chunk>();
-    private int numChunks = 0;
 
     private void GenerateTileChunk()
     {
@@ -140,14 +119,15 @@ public class Controller : MonoBehaviour
         // Iterate through the path and Get random tiles with appropriate connections to fill the slots
         //Loop through the slots and try to fill empty ones with a tile that matches the connections
 
-        Vector2Int startSlot = new Vector2Int(0, Chunk.Height - 1);
+        thisChunk.startSlot = new Vector2Int(0, Chunk.Height - 1);
+        bool firstChunk = true;
         if (chunks.Count > 0)
         {
-            //Debug.Log("Using endSlot with x value = " + chunks[chunks.Count - 1].endSlot.x);
-            startSlot.x = chunks[chunks.Count - 1].endSlot.x;
+            firstChunk = false;
+            thisChunk.startSlot.x = chunks[chunks.Count - 1].endSlot.x;
         }
         else
-            startSlot.x = Chunk.Width / 2;
+            thisChunk.startSlot.x = Chunk.Width / 2;
 
         //Debug.Log("StartSlot = " + startSlot);
 
@@ -156,8 +136,8 @@ public class Controller : MonoBehaviour
 
         //Generate a path between these two by adding random directions that still have a path to the end point.
         List<Dir> testPath = new List<Dir>();
-        int x = startSlot.x;
-        int y = startSlot.y;
+        int x = thisChunk.startSlot.x;
+        int y = thisChunk.startSlot.y;
 
         //Temp path that just makes the simplest L shape to the end
         while (x != thisChunk.endSlot.x)
@@ -195,7 +175,7 @@ public class Controller : MonoBehaviour
         //Search the tile list of the (opposite of the) previous direction for a tile with the next direction (uses down for first and last direction)
         //Create that tile and add it to the chunk
         Debug.Log("Path count = " + testPath.Count);
-        Vector2Int currentTile = startSlot; //used to put the tile in the correct slot
+        Vector2Int currentTile = thisChunk.startSlot; //used to put the tile in the correct slot
         for (int i = 0; i <= testPath.Count; ++i)
         {
             //Define required connections
@@ -208,7 +188,8 @@ public class Controller : MonoBehaviour
                 exit = testPath[i];
             
             bool[] requiredConns = new bool[4];
-            requiredConns[(int)entrance] = true;
+            if (!firstChunk || i != 0)
+                requiredConns[(int)entrance] = true;
             requiredConns[(int)exit] = true;
 
             //Choose two random unnecessary connections to add to this slot (if they would connect within the chunk)
@@ -323,25 +304,57 @@ public class Controller : MonoBehaviour
         return sortedTiles[entrance][rand].gameObject;
     }
 
-    private void DeleteExtraRow()
+    public class Chunk
     {
-        if (_rows.Count > startNumRows + maxExtraRows)
-        {
-            Destroy(_rows[0][0].gameObject);
-            /*
-            foreach (Transform block in _rows[0])
-            {
-                if (block != null)
-                    Destroy(block.gameObject);
-            }
-            */
+        public static int Width = 5;
+        public static int Height = 5;
 
-            _rows.RemoveAt(0);
+        public Transform holder;
+        public SimpleTile[,] slots = new SimpleTile[Width, Height];
+        public Vector2Int endSlot = Vector2Int.zero;
+        public Vector2Int startSlot = Vector2Int.zero;
+
+        public Chunk(Transform parent, Vector2 pos, int number)
+        {
+            holder = new GameObject("Chunk " + number).transform;
+            holder.SetParent(parent);
+            holder.position = pos;
         }
     }
+    #endregion
 
-    // Update is called once per frame
-    void Update()
+    #region Camera
+    private Vector2 unroundedCamPos = Vector2.zero;
+
+    public static Vector2 RoundToNearestPixel(Vector2 pos, Camera viewingCamera)
+    {
+        float x = (Screen.height / (viewingCamera.orthographicSize * 2)) * pos.x;
+        x = Mathf.Round(x);
+        float adjustedX = x / (Screen.height / (viewingCamera.orthographicSize * 2));
+
+        float y = (Screen.height / (viewingCamera.orthographicSize * 2)) * pos.y;
+        y = Mathf.Round(y);
+        float adjustedY = y / (Screen.height / (viewingCamera.orthographicSize * 2));
+        return new Vector2(adjustedX, adjustedY);
+    }
+
+    private void MoveCameraToPlayer()
+    {
+        float distToPlayer = Vector2.Distance(cameraTansform.position, player.position);
+        float targetSpeed = cameraSpeedCurve.Evaluate(distToPlayer);
+        unroundedCamPos = Vector2.MoveTowards(unroundedCamPos, player.position, targetSpeed * Time.deltaTime);
+        cameraTansform.position = RoundToNearestPixel(unroundedCamPos, Camera.main);
+    }
+    #endregion
+
+    #region Steady Downwards Camera [Depreciated]
+    private float cameraFallSpeed = 1;
+    private float speedNearBottomFactor = 2;
+    private float speedIncreaseRate = 0.01f;
+    private float levelBottom = 5;
+    private float levelSide = 3;
+    private float deathHeight = 7;
+    private void MoveCameraDown()
     {
         if (playerDead || player.position.y > cameraTansform.position.y + deathHeight)
         {
@@ -352,9 +365,9 @@ public class Controller : MonoBehaviour
             }
             return;
         }
-        
+
         //If player near bottom go down faster.
-        float distFromBottom = player.position.y -(cameraTansform.position.y - levelBottom);
+        float distFromBottom = player.position.y - (cameraTansform.position.y - levelBottom);
         float speedFactor = 1 + (levelBottom - distFromBottom) / levelBottom;
         //Debug.Log("Dist = " + distFromBottom + ", factor = " + speedFactor);
         cameraTansform.position += new Vector3(0, -cameraFallSpeed * speedFactor * Time.deltaTime);
@@ -364,43 +377,7 @@ public class Controller : MonoBehaviour
 
         cameraFallSpeed += speedIncreaseRate * Time.deltaTime;
     }
-
-    private Vector2 DirOffset(Dir dir)
-    {
-        if (dir == Dir.right)
-            return Vector2.right;
-        else if (dir == Dir.bottom)
-            return Vector2.down;
-        else if (dir == Dir.left)
-            return Vector2.left;
-        else// if(dir == Dir.top)
-            return Vector2.up;
-    }
-
-    private void OnDrawGizmos()
-    {
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireCube(cameraTansform.position - new Vector3(0, levelBottom), Vector3.forward + Vector3.right);
-        Gizmos.DrawWireCube(cameraTansform.position + new Vector3(levelSide, 0), Vector3.forward + Vector3.up);
-        Gizmos.DrawWireCube(cameraTansform.position - new Vector3(levelSide, 0), Vector3.forward + Vector3.up);
-    }
-
-    public class Chunk
-    {
-        public static int Width = 5;
-        public static int Height = 5;
-
-        public Transform holder;
-        public SimpleTile[,] slots = new SimpleTile[Width, Height];
-        public Vector2Int endSlot = Vector2Int.zero;
-
-        public Chunk(Transform parent, Vector2 pos, int number)
-        {
-            holder = new GameObject("Chunk " + number).transform;
-            holder.SetParent(parent);
-            holder.position = pos;
-        }
-    }
+    #endregion
 }
 
 public enum Dir
