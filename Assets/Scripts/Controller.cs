@@ -6,15 +6,20 @@ public class Controller : MonoBehaviour
 {
     #region Settings and References
     public Transform cameraTansform;
-    public Transform player;
+    public GridPlayer player;
     public AnimationCurve cameraSpeedCurve = new AnimationCurve();
-    public float musicBeatRate = 0.25f;
+    public bool startInMiddle = false;
+    [Min(3)]
+    public int maxChunks = 3;
+    public float musicBeatRate = 0.246f;
     public float firstBeat = 0.5f;
-    public int beatsPerAction = 4;
-    public float gridScale = 0.5f;
+    public int beatsPerPlayerMove = 2;
+    public int beatsPerEnemyMove = 4;
+    public const float gridScale = 0.5f;
 
     public GameObject defaultTile;
 
+    public string tilesPath = "/Prefabs/Tiles/";
     public List<GameObject> tilePrefabs = new List<GameObject>();
     #endregion
 
@@ -50,21 +55,14 @@ public class Controller : MonoBehaviour
         {
             nextBeat += musicBeatRate;
             numBeats += 1;
-            if (beatsPerAction != 0 && numBeats % beatsPerAction == 0)
-            {
-                Vector3 movement = Vector3.zero;
-                if (Input.GetKey(KeyCode.W))
-                    movement += new Vector3(0, gridScale);
-                else if (Input.GetKey(KeyCode.S))
-                    movement += new Vector3(0, -gridScale);
-                else if (Input.GetKey(KeyCode.D))
-                    movement += new Vector3(gridScale, 0);
-                else if (Input.GetKey(KeyCode.A))
-                    movement += new Vector3(-gridScale, 0);
+            if (beatsPerPlayerMove != 0 && numBeats % beatsPerPlayerMove == 0)
+                player.Move();
 
-                if (!Physics2D.OverlapPoint(player.position + movement))
-                    player.position += movement;
-            }
+            if (player.transform.position.y < chunks[chunks.Count - 2].holder.position.y)
+                GenerateTileChunk();
+
+            if (beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove == 0)
+                MoveEnemy();
         }
         MoveCameraToPlayer();
     }
@@ -75,6 +73,21 @@ public class Controller : MonoBehaviour
         Gizmos.DrawWireCube(cameraTansform.position - new Vector3(0, levelBottom), Vector3.forward + Vector3.right);
         Gizmos.DrawWireCube(cameraTansform.position + new Vector3(levelSide, 0), Vector3.forward + Vector3.up);
         Gizmos.DrawWireCube(cameraTansform.position - new Vector3(levelSide, 0), Vector3.forward + Vector3.up);
+
+        foreach (Chunk c in chunks)
+        {
+            c.TempDrawNodes();
+        }
+
+        DrawPlayerAndMouseNodes();
+    }
+    #endregion
+
+    #region Player and Enemies
+
+    private void MoveEnemy()
+    {
+
     }
     #endregion
 
@@ -89,6 +102,8 @@ public class Controller : MonoBehaviour
             sortedTiles[i] = new List<SimpleTile>();
         }
 
+        tilePrefabs.AddRange(Resources.LoadAll<GameObject>(tilesPath));
+
         foreach (GameObject pre in tilePrefabs)
         {
             SimpleTile tile = pre.GetComponent<SimpleTile>();
@@ -102,81 +117,83 @@ public class Controller : MonoBehaviour
     
     private void GenerateStartingTiles()
     {
+        CreateCapChunk();
         GenerateTileChunk();
         GenerateTileChunk();
 
-        player.position = chunks[0].slots[chunks[0].startSlot.x, chunks[0].startSlot.y].transform.position;
+        //Place the player in the first tile of the first chunk
+        player.transform.position = chunks[0].slots[chunks[0].startSlot.x, chunks[0].startSlot.y].transform.position;
+        //Place the camera two tiles above the player so it can move and imply the motion
+        cameraTansform.position = player.transform.position + Vector3.up * SimpleTile.heightInCells * gridScale * 2f;
+    }
+
+    private void CreateCapChunk()
+    {
+        Vector2 chunkPos = new Vector2(0, numChunks * -1 * SimpleTile.heightInCells * gridScale);
+        Chunk thisChunk = new Chunk(transform, chunkPos, ++numChunks);
+
+        int startingTile = Chunk.Width / 2;
+        if (startInMiddle == false)
+            startingTile = Random.Range(0, Chunk.Width);
+        thisChunk.startSlot = new Vector2Int(startingTile, 0);
+        thisChunk.endSlot = new Vector2Int(startingTile, 0);
+
+        thisChunk.slots = new SimpleTile[Chunk.Width, 1];
+
+        bool[,][] connectionsMatrix = new bool[Chunk.Width, 1][];
+        bool lastTileWantsConnection = false;
+        for (int x = 0; x < Chunk.Width; ++x)
+        {
+            connectionsMatrix[x, 0] = new bool[4];
+            connectionsMatrix[x, 0][(int)Dir.bottom] = true;
+            if (lastTileWantsConnection)
+                connectionsMatrix[x, 0][(int)Dir.left] = true;
+
+            lastTileWantsConnection = false;
+            if (x < Chunk.Width - 1 && Chunk.Width > 1 && Random.value > 0.33f)
+            {
+                connectionsMatrix[x, 0][(int)Dir.right] = true;
+                lastTileWantsConnection = true;
+            }
+        }
+
+        FillChunkWithTiles(thisChunk, connectionsMatrix);
+
+        thisChunk.GenerateNodes();
+
+        chunks.Add(thisChunk);
     }
 
     private void GenerateTileChunk()
     {
-        Vector2 chunkSize = new Vector2(SimpleTile.widthInCells, SimpleTile.heightInCells) * SimpleTile.cellSize;
-        Vector2 chunkPos = new Vector2(0, -1 * Chunk.Height * SimpleTile.heightInCells * SimpleTile.cellSize * numChunks);
+        #region Initialize Chunk
+        Vector2 chunkPos = new Vector2(0, numChunks * - 1 * Chunk.Height * SimpleTile.heightInCells * gridScale);
         Chunk thisChunk = new Chunk(transform, chunkPos, ++numChunks);
 
-        //Get the end point of the previous chunk
-        //Generate a random path from that point to a random point at the bottom of this chunk
-        // Iterate through the path and Get random tiles with appropriate connections to fill the slots
-        //Loop through the slots and try to fill empty ones with a tile that matches the connections
-
         thisChunk.startSlot = new Vector2Int(0, Chunk.Height - 1);
-        bool firstChunk = true;
         if (chunks.Count > 0)
-        {
-            firstChunk = false;
             thisChunk.startSlot.x = chunks[chunks.Count - 1].endSlot.x;
-        }
         else
             thisChunk.startSlot.x = Chunk.Width / 2;
 
-        //Debug.Log("StartSlot = " + startSlot);
-
         thisChunk.endSlot = new Vector2Int(Random.Range(0, Chunk.Width), 0);
-        //Debug.Log("EndSlot = " + thisChunk.endSlot);
+        int x = 0;
+        int y = 0;
+        #endregion
 
+        #region Invent Path
         //Generate a path between these two by adding random directions that still have a path to the end point.
-        List<Dir> testPath = new List<Dir>();
-        int x = thisChunk.startSlot.x;
-        int y = thisChunk.startSlot.y;
-
-        //Temp path that just makes the simplest L shape to the end
-        while (x != thisChunk.endSlot.x)
+        Dir[] testPath = GenerateChunkPath(thisChunk.startSlot, thisChunk.endSlot);
+        
+        bool[,][] connectionsMatrix = new bool[Chunk.Width, Chunk.Height][];
+        bool[,] filledTiles = new bool[Chunk.Width, Chunk.Height];
+        for (x = 0; x < connectionsMatrix.GetLength(0); ++x)
         {
-            if (x > 100 || x < -100)
-                break;
-            if (x < thisChunk.endSlot.x)
-            {
-                x += 1;
-                testPath.Add(Dir.right);
-            }
-            else
-            {
-                x -= 1;
-                testPath.Add(Dir.left);
-            }
+            for (y = 0; y < connectionsMatrix.GetLength(1); ++y)
+                connectionsMatrix[x, y] = new bool[4];
         }
-        while (y != thisChunk.endSlot.y)
-        {
-            if (y > 100 || y < -100)
-                break;
-            if (y > thisChunk.endSlot.y)
-            {
-                y -= 1;
-                testPath.Add(Dir.bottom);
-            }
-            else
-            {
-                y += 1;
-                testPath.Add(Dir.top);
-            }
-        }
-
-        //Loop through the path of Dirs
-        //Search the tile list of the (opposite of the) previous direction for a tile with the next direction (uses down for first and last direction)
-        //Create that tile and add it to the chunk
-        Debug.Log("Path count = " + testPath.Count);
         Vector2Int currentTile = thisChunk.startSlot; //used to put the tile in the correct slot
-        for (int i = 0; i <= testPath.Count; ++i)
+        for (int i = 0; i <= testPath.Length; ++i)
         {
             //Define required connections
             Dir entrance = Dir.top;
@@ -184,49 +201,40 @@ public class Controller : MonoBehaviour
             if (i != 0)
                 entrance = testPath[i - 1].Opposite();
 
-            if (i < testPath.Count)
+            if (i < testPath.Length)
                 exit = testPath[i];
             
             bool[] requiredConns = new bool[4];
-            if (!firstChunk || i != 0)
-                requiredConns[(int)entrance] = true;
-            requiredConns[(int)exit] = true;
+            connectionsMatrix[currentTile.x, currentTile.y][(int)entrance] = true;
+            connectionsMatrix[currentTile.x, currentTile.y][(int)exit] = true;
 
             //Choose two random unnecessary connections to add to this slot (if they would connect within the chunk)
             int randomDir = Random.Range(0, 4);
             Vector2Int offset = currentTile + ((Dir)randomDir).ToOffset();
             if (offset.x < Chunk.Width && offset.x >= 0 &&
                 offset.y < Chunk.Height && offset.y >= 0)
-                requiredConns[randomDir] = true;
+                connectionsMatrix[currentTile.x, currentTile.y][randomDir] = true;
 
             randomDir = Random.Range(0, 4);
             offset = currentTile + ((Dir)randomDir).ToOffset();
             if (offset.x < Chunk.Width && offset.x >= 0 &&
                 offset.y < Chunk.Height && offset.y >= 0)
-                requiredConns[randomDir] = true;
+                connectionsMatrix[currentTile.x, currentTile.y][randomDir] = true;
 
-            GameObject chosenTile = FindMatchingTile(requiredConns);
-
-            //Instantiate the chosen tile and add to the chunk
-            Vector2 tilePos = ((Vector2)currentTile).MultipliedBy(chunkSize) + chunkPos;
-
-            SimpleTile newTile = Instantiate(chosenTile, tilePos, Quaternion.identity, thisChunk.holder).GetComponent<SimpleTile>();
-            thisChunk.slots[currentTile.x, currentTile.y] = newTile;
+            filledTiles[currentTile.x, currentTile.y] = true;
 
             //Move the currentTile pointer to the next slot in the path
             currentTile += exit.ToOffset();
         }
+        #endregion
 
-        //Loop through all the slots in the chunk
-        //If the slot is empty, find a tile that matches the required connections
-        //Create the tile and add it to the chunk (so new tiles will account for it)
+        #region Randomize Remaining Tiles
         for (x = 0; x < Chunk.Width; ++x)
         {
             for (y = 0; y < Chunk.Height; ++y)
             {
-                if (thisChunk.slots[x, y] == null)
+                if (filledTiles[x, y] == false)
                 {
-                    //Find a chunk to fit this slot
                     bool[] neededDirections = new bool[4];
                     for (int dir = 0; dir < 4; ++dir)
                     {
@@ -237,27 +245,90 @@ public class Controller : MonoBehaviour
                             offset.y >= Chunk.Height || offset.y < 0)
                             continue;
 
-                        if (thisChunk.slots[offset.x, offset.y] == null)
+                        if (filledTiles[offset.x, offset.y] == false)
                             neededDirections[dir] = Random.value > 0.5f;
-                        else if (thisChunk.slots[offset.x, offset.y].connections[dir.OppositeIfDir()])
+                        else if (connectionsMatrix[offset.x, offset.y][dir.OppositeIfDir()])
                             neededDirections[dir] = true;
                     }
-
-                    GameObject chosenTile = FindMatchingTile(neededDirections);
-                    Vector2 tilePos = new Vector2(x, y).MultipliedBy(chunkSize) + chunkPos;
-
-                    SimpleTile newTile = Instantiate(chosenTile, tilePos, Quaternion.identity, thisChunk.holder).GetComponent<SimpleTile>();
-                    thisChunk.slots[x, y] = newTile;
+                    connectionsMatrix[x, y] = neededDirections;
+                    filledTiles[x, y] = true;
                 }
             }
         }
-        /*
-        */
+        #endregion
 
-        //DeleteExtraRow();
+        FillChunkWithTiles(thisChunk, connectionsMatrix);
 
-        //_nextY += 3;
+        thisChunk.GenerateNodes();
+
         chunks.Add(thisChunk);
+
+        if (chunks.Count > maxChunks + 1)
+        {
+            Destroy(chunks[1].holder.gameObject);
+            chunks.RemoveAt(1);
+            chunks[0].holder.Translate(Vector2.down * Chunk.Height * SimpleTile.heightInCells * gridScale);
+        }
+    }
+
+    private Dir[] GenerateChunkPath(Vector2Int startSlot, Vector2Int endSlot)
+    {
+        List<Dir> testPath = new List<Dir>();
+        int x = startSlot.x;
+        int y = startSlot.y;
+
+        //Temp path that just makes the simplest L shape to the end
+        while (x != endSlot.x)
+        {
+            if (x > 100 || x < -100)
+                break;
+            if (x < endSlot.x)
+            {
+                x += 1;
+                testPath.Add(Dir.right);
+            }
+            else
+            {
+                x -= 1;
+                testPath.Add(Dir.left);
+            }
+        }
+        while (y != endSlot.y)
+        {
+            if (y > 100 || y < -100)
+                break;
+            if (y > endSlot.y)
+            {
+                y -= 1;
+                testPath.Add(Dir.bottom);
+            }
+            else
+            {
+                y += 1;
+                testPath.Add(Dir.top);
+            }
+        }
+        return testPath.ToArray();
+    }
+
+    private void FillChunkWithTiles(Chunk thisChunk, bool[,][] connections)
+    {
+        Vector2 tileSize = new Vector2(SimpleTile.widthInCells, SimpleTile.heightInCells) * gridScale;
+        Vector2 halfTile = new Vector2(SimpleTile.widthInCells * gridScale * 0.5f, SimpleTile.heightInCells * gridScale * 0.5f);
+
+        for (int x = 0; x < connections.GetLength(0); ++x)
+        {
+            for (int y = 0; y < connections.GetLength(1); ++y)
+            {
+                GameObject chosenTile = FindMatchingTile(connections[x,y]);
+
+                //Instantiate the chosen tile and add to the chunk
+                Vector2 tilePos = (new Vector2(x, y)).MultipliedBy(tileSize) + (Vector2)thisChunk.holder.position + halfTile;
+
+                SimpleTile newTile = Instantiate(chosenTile, tilePos, Quaternion.identity, thisChunk.holder).GetComponent<SimpleTile>();
+                thisChunk.slots[x, y] = newTile;
+            }
+        }
     }
 
     private GameObject FindMatchingTile(bool[] requiredConnections, bool allowExtraConnections = false)
@@ -314,12 +385,185 @@ public class Controller : MonoBehaviour
         public Vector2Int endSlot = Vector2Int.zero;
         public Vector2Int startSlot = Vector2Int.zero;
 
+        public bool[,] nodes;
+        public Vector2Int bottomConnectNode = Vector2Int.zero;
+        public Vector2Int topConnectNode = Vector2Int.zero;
+
         public Chunk(Transform parent, Vector2 pos, int number)
         {
             holder = new GameObject("Chunk " + number).transform;
             holder.SetParent(parent);
             holder.position = pos;
         }
+
+        public void GenerateNodes()
+        {
+            nodes = new bool[slots.GetLength(0) * SimpleTile.widthInCells, slots.GetLength(1) * SimpleTile.heightInCells];
+
+            Vector2 origin = (Vector2)holder.position + Vector2.one * gridScale * 0.5f;
+            for (int y = 0; y < nodes.GetLength(1); ++y)
+            {
+                for (int x = 0; x < nodes.GetLength(0); ++x)
+                {
+                    if (!Physics2D.OverlapPoint(origin + new Vector2(x, y) * gridScale))
+                        nodes[x, y] = true;
+                }
+            }
+
+            bottomConnectNode = new Vector2Int(Mathf.FloorToInt((endSlot.x + 0.5f) * SimpleTile.widthInCells), 0);
+            topConnectNode = new Vector2Int(Mathf.FloorToInt((startSlot.x + 0.5f) * SimpleTile.widthInCells), nodes.GetLength(1));
+        }
+
+        public void TempDrawNodes()
+        {
+            Gizmos.color = Color.red;
+            Vector2 origin = (Vector2)holder.position + Vector2.one * gridScale * 0.5f;
+            for (int x = 0; x < nodes.GetLength(0); ++x)
+            {
+                for (int y = 0; y < nodes.GetLength(1); ++y)
+                {
+                    if (nodes[x, y])
+                        Gizmos.DrawSphere(origin + new Vector2(x, y) * gridScale, gridScale * 0.1f);
+                }
+            }
+        }
+    }
+    #endregion
+
+    #region Enemy Pathfinding
+    List<Node> nodeQueue = new List<Node>();
+    List<Node> triedNodes = new List<Node>();
+
+    private Dir[] GetPathAStar(Vector2 startPos, Vector2 goal)
+    {
+        bool[,] env = new bool[1, 1];
+
+        Vector2 origin;
+        Vector2Int nodeStart = Vector2Int.zero;
+        Vector2Int nodeGoal = Vector2Int.zero;
+        foreach (Chunk c in chunks)
+        {
+            if (startPos.y < c.holder.position.y)
+                continue;
+            else
+            {
+                env = c.nodes;
+                origin = c.holder.position;
+
+                nodeStart = ((startPos - origin) / gridScale).FloorToV2Int();
+
+                //If the goal is below this chunk, make the connectNode the target;
+                if (goal.y < c.holder.position.y)
+                    nodeGoal = c.bottomConnectNode;
+                else if (goal.y > c.holder.position.y + Chunk.Height * SimpleTile.heightInCells * gridScale)
+                    nodeGoal = c.topConnectNode;
+                else
+                    nodeGoal = ((goal - origin) / gridScale).FloorToV2Int();
+                break;
+            }
+        }
+
+        int nodeIndex = 0;
+        while (nodeQueue.Count > 0)
+        {
+            Node currentNode = nodeQueue[0];
+            //Remove the first node from the list (this node).
+            triedNodes.Add(currentNode);
+            nodeIndex = triedNodes.Count - 1;
+            nodeQueue.RemoveAt(0);
+
+            for (int dir = 0; dir < 4; ++dir)
+            {
+                Vector2Int offset = ((Dir)dir).ToOffset();
+                offset.x += currentNode.pos.x;
+                offset.y += currentNode.pos.y;
+
+                if (offset == nodeGoal)
+                {
+                    //GOAL FOUND!!!
+                    //Backtrack through nodes and create path
+                }
+
+                if (offset.x >= Chunk.Width || offset.x < 0 ||
+                    offset.y >= Chunk.Height || offset.y < 0)
+                    continue;
+
+                if (env[offset.x, offset.y] == true)
+                {
+                    /*
+                    if (nodeQueue.Find(X => X.pos == offset) == null &&
+                        triedNodes.Find(X => X.pos == offset) == null)
+                        nodeQueue.Add(new Node(
+                        */
+                }
+            }
+
+        }
+
+        return new Dir[1];
+    }
+
+    //private int Cost(
+
+    private class Node
+    {
+        public Vector2Int pos = Vector2Int.zero;
+        public Dir action = Dir.top;
+        public int stepsFromStart = -1;
+        public int stepsToEnd = -1;
+        public int parentIndex = -1;
+
+        public Node(Vector2Int Position, Dir Action, int Level, int Cost, int ParentIndex)
+        {
+            pos = Position;
+            action = Action;
+            stepsFromStart = Level;
+            stepsToEnd = Cost;
+            parentIndex = ParentIndex;
+        }
+
+        public int H()
+        {
+            return stepsFromStart + stepsToEnd;
+        }
+    }
+
+    private void DrawPlayerAndMouseNodes()
+    {
+        Vector2 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Vector2 origin = Vector2Int.zero;
+        Vector2Int nodeStart = Vector2Int.zero;
+        Vector2Int nodeGoal = Vector2Int.zero;
+        foreach (Chunk c in chunks)
+        {
+            if (player.transform.position.y < c.holder.position.y)
+                continue;
+            else
+            {
+                origin = c.holder.position;
+                Gizmos.color = Color.blue;
+                Gizmos.DrawSphere(origin, gridScale * 0.4f);
+
+                nodeStart = (((Vector2)player.transform.position - origin) / gridScale).FloorToV2Int();
+
+                //If the goal is below this chunk, make the connectNode the target;
+                if (mousePos.y < c.holder.position.y)
+                    nodeGoal = c.bottomConnectNode;
+                else if (mousePos.y > c.holder.position.y + Chunk.Height * SimpleTile.heightInCells * gridScale)
+                    nodeGoal = c.topConnectNode;
+                else
+                    nodeGoal = ((mousePos - origin) / gridScale).FloorToV2Int();
+                break;
+            }
+        }
+
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(player.transform.position, gridScale * 0.5f);
+        Gizmos.DrawSphere(origin + (Vector2)nodeStart * gridScale + Vector2.one * gridScale * 0.5f, gridScale * 0.4f);
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(mousePos, gridScale * 0.5f);
+        Gizmos.DrawSphere(origin + (Vector2)nodeGoal * gridScale + Vector2.one * gridScale * 0.5f, gridScale * 0.4f);
     }
     #endregion
 
@@ -340,10 +584,11 @@ public class Controller : MonoBehaviour
 
     private void MoveCameraToPlayer()
     {
-        float distToPlayer = Vector2.Distance(cameraTansform.position, player.position);
+        float distToPlayer = Vector2.Distance(cameraTansform.position, player.transform.position);
         float targetSpeed = cameraSpeedCurve.Evaluate(distToPlayer);
-        unroundedCamPos = Vector2.MoveTowards(unroundedCamPos, player.position, targetSpeed * Time.deltaTime);
-        cameraTansform.position = RoundToNearestPixel(unroundedCamPos, Camera.main);
+        unroundedCamPos = Vector2.MoveTowards(unroundedCamPos, player.transform.position, targetSpeed * Time.deltaTime);
+        //cameraTansform.position = RoundToNearestPixel(unroundedCamPos, Camera.main);
+        cameraTansform.position = unroundedCamPos;
     }
     #endregion
 
@@ -356,7 +601,7 @@ public class Controller : MonoBehaviour
     private float deathHeight = 7;
     private void MoveCameraDown()
     {
-        if (playerDead || player.position.y > cameraTansform.position.y + deathHeight)
+        if (playerDead || player.transform.position.y > cameraTansform.position.y + deathHeight)
         {
             if (!playerDead)
             {
@@ -367,7 +612,7 @@ public class Controller : MonoBehaviour
         }
 
         //If player near bottom go down faster.
-        float distFromBottom = player.position.y - (cameraTansform.position.y - levelBottom);
+        float distFromBottom = player.transform.position.y - (cameraTansform.position.y - levelBottom);
         float speedFactor = 1 + (levelBottom - distFromBottom) / levelBottom;
         //Debug.Log("Dist = " + distFromBottom + ", factor = " + speedFactor);
         cameraTansform.position += new Vector3(0, -cameraFallSpeed * speedFactor * Time.deltaTime);
@@ -432,6 +677,11 @@ public static class Utility
 
     public static Vector2 MultipliedBy(this Vector2 a, Vector2 b)
     {
-        return new Vector3(a.x * b.x, a.y * b.y);
+        return new Vector2(a.x * b.x, a.y * b.y);
+    }
+
+    public static Vector2Int FloorToV2Int(this Vector2 a)
+    {
+        return new Vector2Int(Mathf.FloorToInt(a.x), Mathf.FloorToInt(a.y));
     }
 }

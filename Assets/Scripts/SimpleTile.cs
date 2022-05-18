@@ -6,7 +6,6 @@ public class SimpleTile : MonoBehaviour
 {
     public static int widthInCells = 11;
     public static int heightInCells = 7;
-    public static float cellSize = 0.5f;
 
     [SerializeField]
     private bool showGizmos = false;
@@ -15,6 +14,7 @@ public class SimpleTile : MonoBehaviour
 
     private void OnDrawGizmos()
     {
+        
         if (!showGizmos)
             return;
 
@@ -23,10 +23,10 @@ public class SimpleTile : MonoBehaviour
         Gizmos.color = Color.cyan;
         //Draw left lines
         Vector3 pos = transform.position;
-        Vector3 left = d + Vector3.left * widthInCells * cellSize * 0.5f;
-        Vector3 right =  d + Vector3.right * widthInCells * cellSize * 0.5f;
-        Vector3 top = d + Vector3.up * heightInCells * cellSize * 0.5f;
-        Vector3 bottom = d + Vector3.down * heightInCells * cellSize * 0.5f;
+        Vector3 left = d + Vector3.left * widthInCells * Controller.gridScale * 0.5f;
+        Vector3 right =  d + Vector3.right * widthInCells * Controller.gridScale * 0.5f;
+        Vector3 top = d + Vector3.up * heightInCells * Controller.gridScale * 0.5f;
+        Vector3 bottom = d + Vector3.down * heightInCells * Controller.gridScale * 0.5f;
 
         //Draw border lines
         Gizmos.DrawLine(pos + left + top, pos + left + bottom);
@@ -38,15 +38,10 @@ public class SimpleTile : MonoBehaviour
         {
             if (connections[i])
             {
-                Vector2 multiplier = (new Vector2(widthInCells + 1, heightInCells + 1) * 0.5f * cellSize);
+                Vector2 multiplier = (new Vector2(widthInCells + 1, heightInCells + 1) * 0.5f * Controller.gridScale);
                 Vector2 drawPos = ((Dir)i).ToV2().MultipliedBy(multiplier);
-                Gizmos.DrawCube((Vector2)transform.position + drawPos, Vector3.one * cellSize * 0.95f);
+                Gizmos.DrawCube((Vector2)transform.position + drawPos, Vector3.one * Controller.gridScale * 0.95f);
             }
-        }
-
-        foreach (bool conn in connections)
-        {
-
         }
     }
 }
