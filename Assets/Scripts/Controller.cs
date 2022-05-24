@@ -1,12 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class Controller : MonoBehaviour
 {
     #region Settings and References
     public Transform cameraTansform;
     public GridPlayer player;
+    public Enemy testEnemy;
+    public Text scoreText;
     public AnimationCurve cameraSpeedCurve = new AnimationCurve();
     public bool startInMiddle = false;
     [Min(3)]
@@ -21,6 +24,14 @@ public class Controller : MonoBehaviour
 
     public string tilesPath = "/Prefabs/Tiles/";
     public List<GameObject> tilePrefabs = new List<GameObject>();
+    public bool showPathfindingGizmos = false;
+    public bool showBeatsAnalysis = false;
+    public float beatsXScale = 3f;
+    public float beatsYScale = 10f;
+    public float beatsSize = 0.5f;
+    public Vector2 beatsOrigin = new Vector2();
+
+    public List<float> beatTimes = new List<float>();
     #endregion
 
     #region Controller Variables
@@ -28,11 +39,16 @@ public class Controller : MonoBehaviour
     
     private bool playerDead = false;
     private float nextBeat = 0;
+    private int nextManualBeat = 0;
     private int numBeats = 0;
     private AudioSource musicPlayer;
 
     private List<Tile[]> generatedTiles = new List<Tile[]>();
     private List<Vector2> downConnections = new List<Vector2>();
+
+    private List<Enemy> enemies = new List<Enemy>();
+
+    public float score = 0;
     #endregion
 
     #region Unity Events
@@ -43,6 +59,9 @@ public class Controller : MonoBehaviour
         GenerateStartingTiles();
         musicPlayer = GetComponent<AudioSource>();
         nextBeat = firstBeat;
+
+        testEnemy.transform.position = player.transform.position + (Vector3.up * gridScale * 2);
+        enemies.Add(testEnemy);
     }
 
     // Update is called once per frame
@@ -51,7 +70,7 @@ public class Controller : MonoBehaviour
         if (!musicPlayer.isPlaying && Time.time >= firstBeat)
             musicPlayer.Play();
 
-        if (Time.time >= nextBeat)
+        if (musicPlayer.time >= nextBeat)
         {
             nextBeat += musicBeatRate;
             numBeats += 1;
@@ -61,33 +80,140 @@ public class Controller : MonoBehaviour
             if (player.transform.position.y < chunks[chunks.Count - 2].holder.position.y)
                 GenerateTileChunk();
 
-            if (beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove == 0)
-                MoveEnemy();
+            if (beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove != 0)
+                MoveEnemies();
         }
         MoveCameraToPlayer();
+
+        //Manually recorded beats:
+        /*
+        if (beatTimes.Count > nextManualBeat && musicPlayer.time >= beatTimes[nextManualBeat])
+        {
+            nextManualBeat += 1;
+
+            if (beatsPerEnemyMove != 0 && nextManualBeat % beatsPerEnemyMove == 0)
+                MoveEnemies();
+        }
+        */
+
+        PlayerMoveAndScore();
     }
 
     private void OnDrawGizmos()
     {
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireCube(cameraTansform.position - new Vector3(0, levelBottom), Vector3.forward + Vector3.right);
-        Gizmos.DrawWireCube(cameraTansform.position + new Vector3(levelSide, 0), Vector3.forward + Vector3.up);
-        Gizmos.DrawWireCube(cameraTansform.position - new Vector3(levelSide, 0), Vector3.forward + Vector3.up);
+        if (showBeatsAnalysis)
+            AnalyzeBeats();
 
-        foreach (Chunk c in chunks)
+        if (showPathfindingGizmos)
         {
-            c.TempDrawNodes();
+            foreach (Chunk c in chunks)
+            {
+                c.TempDrawNodes();
+            }
+            DrawPlayerAndMouseNodes();
         }
+    }
 
-        DrawPlayerAndMouseNodes();
+    void AnalyzeBeats()
+    {
+        if (beatTimes.Count < 2)
+            return;
+
+        float lastBeat = beatTimes[0];
+        float totalDifference = 0;
+        float minDifference = 100;
+        float maxDifference = 0;
+        foreach (float beat in beatTimes)
+        {
+            Vector2 point = beatsOrigin + Vector2.right * beat * beatsXScale;
+            Gizmos.color = Color.blue;
+            Gizmos.DrawSphere(point, beatsSize);
+            float difference = beat - lastBeat;
+            if (difference < minDifference)
+                minDifference = difference;
+            totalDifference += difference;
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(point, point + Vector2.up * difference * beatsYScale);
+            lastBeat = beat;
+        }
+        Vector2 guideLinePos = Vector2.up * (beatTimes[1] - beatTimes[0]) * beatsYScale;
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawLine(beatsOrigin + guideLinePos, beatsOrigin + guideLinePos + Vector2.right * beatTimes[beatTimes.Count - 1] * beatsXScale);
+        float averageDifference = totalDifference / (beatTimes.Count - 1);
+        Vector2 averageLinePos = Vector2.up * averageDifference * beatsYScale;
+
+        Gizmos.color = Color.green;
+        Gizmos.DrawLine(beatsOrigin + averageLinePos, beatsOrigin + averageLinePos + Vector2.right * beatTimes[beatTimes.Count - 1] * beatsXScale);
+
+        Vector2 fixedBeatsLine = Vector2.up * musicBeatRate * beatsYScale;
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawLine(beatsOrigin + fixedBeatsLine, beatsOrigin + fixedBeatsLine + Vector2.right * beatTimes[beatTimes.Count - 1] * beatsXScale);
+
+        //Draw the current beat over the human beats:
+
+        Gizmos.color = Color.white;
+        Vector2 start = beatsOrigin + Vector2.right * beatTimes[0] * beatsXScale;
+        for (int i = 0; i < beatTimes.Count - 1; ++i)
+        {
+            Vector2 point = start + Vector2.right * i * musicBeatRate * beatsXScale;
+            Gizmos.DrawLine(point, point + averageLinePos);
+        }
     }
     #endregion
 
     #region Player and Enemies
-
-    private void MoveEnemy()
+    private void PlayerMoveAndScore()
     {
 
+        if (Input.GetMouseButtonDown(0))
+        {
+            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            Vector2 delta = mousePos - player.transform.position;
+
+            Vector3 move = Vector2.zero;
+            //If the tap was not too close to the player
+            if (delta.sqrMagnitude > Mathf.Pow(gridScale * 3f, 2))
+            {
+                if (delta.x > delta.y) //Right or Down
+                {
+                    if (delta.x > -delta.y) //Right
+                        move = Vector2.right;
+                    else //Down
+                        move = Vector2.down;
+                }
+                else //Up or Left
+                {
+                    if (delta.x > -delta.y) //Up
+                        move = Vector2.up;
+                    else //Left
+                        move = Vector2.left;
+                }
+            }
+
+            move *= gridScale;
+
+            if (!Physics2D.OverlapPoint(player.transform.position + move))
+            {
+                player.transform.position += move;
+
+                //Score the move
+                float diff = nextBeat - musicPlayer.time;
+                float moveScore = ((musicBeatRate / 5) - Mathf.PingPong(diff, musicBeatRate / 2)) / (musicBeatRate / 5);
+                moveScore = Mathf.Floor(moveScore * 100);
+                //Debug.Log("Diff = " + diff + ", Score = " + moveScore);
+                score += moveScore;
+                scoreText.text = score.ToString();
+            }
+        }
+    }
+
+    private void MoveEnemies()
+    {
+        foreach (Enemy E in enemies)
+        {
+            E.path = GetPathAStar(E.transform.position, player.transform.position);
+            E.Move(player.transform.position);
+        }
     }
     #endregion
 
@@ -427,6 +553,11 @@ public class Controller : MonoBehaviour
                 }
             }
         }
+
+        public void TempDrawExits()
+        {
+
+        }
     }
     #endregion
 
@@ -454,18 +585,42 @@ public class Controller : MonoBehaviour
 
                 //If the goal is below this chunk, make the connectNode the target;
                 if (goal.y < c.holder.position.y)
+                {
                     nodeGoal = c.bottomConnectNode;
+                    if (nodeStart == nodeGoal)
+                    {
+                        Dir[] connection = new Dir[1];
+                        connection[0] = Dir.bottom;
+                        return connection;
+                    }
+                }
                 else if (goal.y > c.holder.position.y + Chunk.Height * SimpleTile.heightInCells * gridScale)
+                {
                     nodeGoal = c.topConnectNode;
+                    if (nodeStart == nodeGoal)
+                    {
+                        Dir[] connection = new Dir[1];
+                        connection[0] = Dir.top;
+                        return connection;
+                    }
+                }
                 else
                     nodeGoal = ((goal - origin) / gridScale).FloorToV2Int();
+
                 break;
             }
         }
 
+        bool foundGoal = false;
         int nodeIndex = 0;
-        while (nodeQueue.Count > 0)
+        nodeQueue.Clear();
+        nodeQueue.Add(new Node(nodeStart, Dir.bottom, 0, Cost(nodeStart, nodeGoal), -1));
+        triedNodes.Clear();
+        
+        int counter = 0;
+        while (nodeQueue.Count > 0 && foundGoal == false && counter < 1000)
         {
+            counter += 1;
             Node currentNode = nodeQueue[0];
             //Remove the first node from the list (this node).
             triedNodes.Add(currentNode);
@@ -478,39 +633,59 @@ public class Controller : MonoBehaviour
                 offset.x += currentNode.pos.x;
                 offset.y += currentNode.pos.y;
 
+                //Debug.Log("Searching neighbor " + offset);
                 if (offset == nodeGoal)
                 {
-                    //GOAL FOUND!!!
-                    //Backtrack through nodes and create path
+                    foundGoal = true;
+                    triedNodes.Add(new Node(offset, (Dir) dir, currentNode.stepsFromStart +1, Cost(offset, nodeGoal), nodeIndex));
+                    break;
                 }
 
-                if (offset.x >= Chunk.Width || offset.x < 0 ||
-                    offset.y >= Chunk.Height || offset.y < 0)
+                if (offset.x >= env.GetLength(0) || offset.x < 0 ||
+                    offset.y >= env.GetLength(1) || offset.y < 0)
                     continue;
 
                 if (env[offset.x, offset.y] == true)
                 {
-                    /*
                     if (nodeQueue.Find(X => X.pos == offset) == null &&
                         triedNodes.Find(X => X.pos == offset) == null)
-                        nodeQueue.Add(new Node(
-                        */
+                    {
+                        Node newNode = new Node(offset, (Dir)dir, currentNode.stepsFromStart + 1, Cost(offset, nodeGoal), nodeIndex);
+                        int index = nodeQueue.Count - 1;
+                        while (index > 0 && newNode.H < nodeQueue[index].H)
+                            --index;
+                        nodeQueue.Insert(index + 1, newNode);
+                        //nodeQueue.Add(new Node(offset, (Dir)dir, currentNode.stepsFromStart + 1, Cost(offset, nodeGoal), nodeIndex));
+                    }
                 }
             }
-
         }
 
-        return new Dir[1];
+        List<Dir> path = new List<Dir>();
+        if (foundGoal)
+        {
+            Node nextNode = triedNodes[triedNodes.Count - 1];
+            while (nextNode.parentIndex != -1)
+            {
+                path.Insert(0, nextNode.action);
+                nextNode = triedNodes[nextNode.parentIndex];
+            }
+        }
+
+        return path.ToArray();
     }
 
-    //private int Cost(
+    private int Cost(Vector2Int from, Vector2Int to)
+    {
+        return Mathf.Abs(to.x - from.x) + Mathf.Abs(to.y - from.y);
+    }
 
     private class Node
     {
         public Vector2Int pos = Vector2Int.zero;
         public Dir action = Dir.top;
         public int stepsFromStart = -1;
-        public int stepsToEnd = -1;
+        public int minStepsToEnd = -1;
         public int parentIndex = -1;
 
         public Node(Vector2Int Position, Dir Action, int Level, int Cost, int ParentIndex)
@@ -518,16 +693,18 @@ public class Controller : MonoBehaviour
             pos = Position;
             action = Action;
             stepsFromStart = Level;
-            stepsToEnd = Cost;
+            minStepsToEnd = Cost;
             parentIndex = ParentIndex;
         }
 
-        public int H()
+        public int H
         {
-            return stepsFromStart + stepsToEnd;
+            get { return stepsFromStart + minStepsToEnd; }
         }
     }
 
+    private Dir[] dirPath;
+    private Vector2 pathStart;
     private void DrawPlayerAndMouseNodes()
     {
         Vector2 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
@@ -564,6 +741,18 @@ public class Controller : MonoBehaviour
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(mousePos, gridScale * 0.5f);
         Gizmos.DrawSphere(origin + (Vector2)nodeGoal * gridScale + Vector2.one * gridScale * 0.5f, gridScale * 0.4f);
+
+        if (dirPath != null && dirPath.Length > 0)
+        {
+            Vector2 lastPoint = pathStart;
+            Vector2 nextPoint = pathStart;
+            foreach (Dir dir in dirPath)
+            {
+                nextPoint = lastPoint + dir.ToV2() * gridScale;
+                Gizmos.DrawLine(lastPoint, nextPoint);
+                lastPoint = nextPoint;
+            }
+        }
     }
     #endregion
 

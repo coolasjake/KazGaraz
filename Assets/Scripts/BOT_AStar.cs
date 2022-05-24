@@ -116,7 +116,7 @@ public class BOT_AStar
             {
                 foreach (Vector2Int delta in deltas)
                 {
-                    cost = FindCost(currentNode.state + delta);
+                    cost =FindCost(currentNode.state + delta);
                     Node newNode = new Node(currentNode.state + delta, delta, currentNode.level + 1, cost, nodeIndex);
                     Node existing = nodeQueue.Find(X => X.state == newNode.state);
                     if (existing != null)
