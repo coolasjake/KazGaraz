@@ -56,12 +56,13 @@ public class Controller : MonoBehaviour
     void Start()
     {
         SortTilePrefabs();
-        GenerateStartingTiles();
         musicPlayer = GetComponent<AudioSource>();
         nextBeat = firstBeat;
 
         testEnemy.transform.position = player.transform.position + (Vector3.up * gridScale * 2);
         enemies.Add(testEnemy);
+
+        GenerateStartingTiles();
     }
 
     // Update is called once per frame
@@ -309,14 +310,23 @@ public class Controller : MonoBehaviour
 
         #region Invent Path
         //Generate a path between these two by adding random directions that still have a path to the end point.
-        Dir[] testPath = GenerateChunkPath(thisChunk.startSlot, thisChunk.endSlot);
-        
+        Dir[] testPath = GenerateRandomChunkPath(thisChunk.startSlot, thisChunk.endSlot);
+        //Dir[] testPath = GenerateChunkPath(thisChunk.startSlot, thisChunk.endSlot);
+
         bool[,][] connectionsMatrix = new bool[Chunk.Width, Chunk.Height][];
         bool[,] filledTiles = new bool[Chunk.Width, Chunk.Height];
         for (x = 0; x < connectionsMatrix.GetLength(0); ++x)
         {
             for (y = 0; y < connectionsMatrix.GetLength(1); ++y)
                 connectionsMatrix[x, y] = new bool[4];
+        }
+        for (x = 0; x < connectionsMatrix.GetLength(0); ++x)
+        {
+            for (y = 0; y < connectionsMatrix.GetLength(1); ++y)
+            {
+                for (int dir = 0; dir < 4; ++dir)
+                    Debug.Log(connectionsMatrix[x, y][dir]);
+            }
         }
         Vector2Int currentTile = thisChunk.startSlot; //used to put the tile in the correct slot
         for (int i = 0; i <= testPath.Length; ++i)
@@ -341,11 +351,13 @@ public class Controller : MonoBehaviour
                 offset.y < Chunk.Height && offset.y >= 0)
                 connectionsMatrix[currentTile.x, currentTile.y][randomDir] = true;
 
+            /*
             randomDir = Random.Range(0, 4);
             offset = currentTile + ((Dir)randomDir).ToOffset();
             if (offset.x < Chunk.Width && offset.x >= 0 &&
                 offset.y < Chunk.Height && offset.y >= 0)
                 connectionsMatrix[currentTile.x, currentTile.y][randomDir] = true;
+            */
 
             filledTiles[currentTile.x, currentTile.y] = true;
 
@@ -435,6 +447,102 @@ public class Controller : MonoBehaviour
             }
         }
         return testPath.ToArray();
+    }
+
+    private Dir[] GenerateRandomChunkPath(Vector2Int startSlot, Vector2Int endSlot)
+    {
+        List<Dir> path = new List<Dir>();
+        bool[,] env = new bool[Chunk.Width, Chunk.Height];
+
+        Vector2Int currentTile = startSlot;
+        env[currentTile.x, currentTile.y] = true;
+
+        List<Dir> options = new List<Dir>();
+        List<Vector2Int> nodes = new List<Vector2Int>();
+
+        int maxLoops = 1000;
+        while (--maxLoops > 0)
+        {
+            //Finish once the end slot is reached
+            if (currentTile == endSlot)
+                break;
+
+            //Setup the options around the current slot
+            options.Clear();
+            for (int dir = 0; dir < 4; ++dir)
+            {
+                Vector2Int offset = ((Dir)dir).ToOffset();
+                offset.x += currentTile.x;
+                offset.y += currentTile.y;
+                if (offset.x >= Chunk.Width || offset.x < 0 ||
+                    offset.y >= Chunk.Height || offset.y < 0)
+                    continue;
+                if (env[offset.x, offset.y])
+                    continue;
+
+                options.Add((Dir)dir);
+            }
+
+            //Find a random slot that has a path to the end slot
+            for (int i = 0; i < 3; ++i)
+            {
+                int choice = Random.Range(0, options.Count);
+                nodes.Clear();
+                nodes.Add(currentTile + options[choice].ToOffset());
+                int nextNode = 0;
+                bool hasPath = false;
+                int safety = 1000;
+                //Do a simple BFS by checking each node until there are none left or the target is found
+                while (nextNode < nodes.Count && hasPath == false)
+                {
+                    if (safety-- < 0)
+                        break;
+                    Vector2Int currentNode = nodes[nextNode];
+                    nextNode++;
+                    for (int dir = 0; dir < 4; ++dir)
+                    {
+                        Vector2Int offset = ((Dir)dir).ToOffset();
+                        offset.x += currentNode.x;
+                        offset.y += currentNode.y;
+
+                        if (offset == endSlot)
+                        {
+                            hasPath = true;
+                            break;
+                        }
+
+                        if (offset.x >= Chunk.Width || offset.x < 0 ||
+                            offset.y >= Chunk.Height || offset.y < 0)
+                            continue;
+                        if (env[offset.x, offset.y])
+                            continue;
+
+                        if (nodes.Contains(offset))
+                            continue;
+
+                        nodes.Add(offset);
+                    }
+
+                    if (hasPath)
+                        break;
+                }
+
+                //If the BFS found the goal: add the random choice to the path, otherwise remove it from the options list
+                if (hasPath)
+                {
+                    path.Add(options[choice]);
+                    currentTile += options[choice].ToOffset();
+                    env[currentTile.x, currentTile.y] = true;
+                    break;
+                }
+                else
+                    options.RemoveAt(choice);
+            }
+        }
+
+        //Return the path.
+        
+        return path.ToArray();
     }
 
     private void FillChunkWithTiles(Chunk thisChunk, bool[,][] connections)
