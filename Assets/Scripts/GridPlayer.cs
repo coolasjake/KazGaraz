@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class GridPlayer : MonoBehaviour
 {
-    public void Move()
+    public void FixedMove()
     {
         Vector3 movement = Vector3.zero;
         if (Input.GetKey(KeyCode.W))

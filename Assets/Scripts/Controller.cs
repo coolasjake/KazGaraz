@@ -6,6 +6,8 @@ using UnityEngine.UI;
 public class Controller : MonoBehaviour
 {
     #region Settings and References
+    public static bool easyMode = false;
+
     public Transform cameraTansform;
     public GridPlayer player;
     public Enemy testEnemy;
@@ -32,6 +34,8 @@ public class Controller : MonoBehaviour
     public Vector2 beatsOrigin = new Vector2();
 
     public List<float> beatTimes = new List<float>();
+    public List<Vector2Int> brokenPathVals = new List<Vector2Int>();
+    private bool pathIsBroken = false;
     #endregion
 
     #region Controller Variables
@@ -59,6 +63,11 @@ public class Controller : MonoBehaviour
         musicPlayer = GetComponent<AudioSource>();
         nextBeat = firstBeat;
 
+        if (easyMode)
+            beatsPerEnemyMove = 2;
+        else
+            beatsPerEnemyMove = 4;
+
         testEnemy.transform.position = player.transform.position + (Vector3.up * gridScale * 2);
         enemies.Add(testEnemy);
 
@@ -75,29 +84,30 @@ public class Controller : MonoBehaviour
         {
             nextBeat += musicBeatRate;
             numBeats += 1;
-            if (beatsPerPlayerMove != 0 && numBeats % beatsPerPlayerMove == 0)
-                player.Move();
+            if (easyMode && beatsPerPlayerMove != 0 && numBeats % beatsPerPlayerMove == 0)
+                player.FixedMove();
 
             if (player.transform.position.y < chunks[chunks.Count - 2].holder.position.y)
                 GenerateTileChunk();
 
-            if (beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove != 0)
-                MoveEnemies();
+            if (easyMode == true)
+            {
+                //Move on main-beats (only first in set)
+                if (beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove == 0)
+                    MoveEnemies();
+            }
+            else
+            {
+                //Move on off-beats (all beats except first)
+                if (beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove != 0)
+                    MoveEnemies();
+            }
         }
+
         MoveCameraToPlayer();
 
-        //Manually recorded beats:
-        /*
-        if (beatTimes.Count > nextManualBeat && musicPlayer.time >= beatTimes[nextManualBeat])
-        {
-            nextManualBeat += 1;
-
-            if (beatsPerEnemyMove != 0 && nextManualBeat % beatsPerEnemyMove == 0)
-                MoveEnemies();
-        }
-        */
-
-        PlayerMoveAndScore();
+        if (!easyMode)
+            PlayerMoveAndScore();
     }
 
     private void OnDrawGizmos()
@@ -113,6 +123,8 @@ public class Controller : MonoBehaviour
             }
             DrawPlayerAndMouseNodes();
         }
+
+        DrawBrokenPath();
     }
 
     void AnalyzeBeats()
@@ -320,14 +332,6 @@ public class Controller : MonoBehaviour
             for (y = 0; y < connectionsMatrix.GetLength(1); ++y)
                 connectionsMatrix[x, y] = new bool[4];
         }
-        for (x = 0; x < connectionsMatrix.GetLength(0); ++x)
-        {
-            for (y = 0; y < connectionsMatrix.GetLength(1); ++y)
-            {
-                for (int dir = 0; dir < 4; ++dir)
-                    Debug.Log(connectionsMatrix[x, y][dir]);
-            }
-        }
         Vector2Int currentTile = thisChunk.startSlot; //used to put the tile in the correct slot
         for (int i = 0; i <= testPath.Length; ++i)
         {
@@ -451,6 +455,9 @@ public class Controller : MonoBehaviour
 
     private Dir[] GenerateRandomChunkPath(Vector2Int startSlot, Vector2Int endSlot)
     {
+        if (pathIsBroken)
+            return new Dir[] { Dir.bottom };
+
         List<Dir> path = new List<Dir>();
         bool[,] env = new bool[Chunk.Width, Chunk.Height];
 
@@ -459,6 +466,9 @@ public class Controller : MonoBehaviour
 
         List<Dir> options = new List<Dir>();
         List<Vector2Int> nodes = new List<Vector2Int>();
+        
+        pathIsBroken = true;
+        brokenPathVals.Add(currentTile);
 
         int maxLoops = 1000;
         while (--maxLoops > 0)
@@ -482,7 +492,7 @@ public class Controller : MonoBehaviour
 
                 options.Add((Dir)dir);
             }
-
+            
             //Find a random slot that has a path to the end slot
             for (int i = 0; i < 3; ++i)
             {
@@ -492,6 +502,9 @@ public class Controller : MonoBehaviour
                 int nextNode = 0;
                 bool hasPath = false;
                 int safety = 1000;
+                //Check if this option is already the target
+                if (currentTile + options[choice].ToOffset() == endSlot)
+                    hasPath = true;
                 //Do a simple BFS by checking each node until there are none left or the target is found
                 while (nextNode < nodes.Count && hasPath == false)
                 {
@@ -532,6 +545,7 @@ public class Controller : MonoBehaviour
                 {
                     path.Add(options[choice]);
                     currentTile += options[choice].ToOffset();
+                    brokenPathVals.Add(currentTile);
                     env[currentTile.x, currentTile.y] = true;
                     break;
                 }
@@ -540,8 +554,11 @@ public class Controller : MonoBehaviour
             }
         }
 
+        pathIsBroken = false;
+        brokenPathVals.Clear();
+
         //Return the path.
-        
+
         return path.ToArray();
     }
 
@@ -860,6 +877,20 @@ public class Controller : MonoBehaviour
                 Gizmos.DrawLine(lastPoint, nextPoint);
                 lastPoint = nextPoint;
             }
+        }
+    }
+    private void DrawBrokenPath()
+    {
+        if (chunks.Count < 1 || pathIsBroken == false)
+            return;
+        Vector2 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Vector2 origin = Vector2Int.zero;
+        origin = chunks[chunks.Count - 1].holder.position;
+        Vector2 tileSize = new Vector2(SimpleTile.widthInCells * gridScale, SimpleTile.heightInCells * gridScale);
+
+        foreach (Vector2Int tile in brokenPathVals)
+        {
+            Gizmos.DrawSphere(origin + (Vector2)tile * tileSize + tileSize * 0.5f, gridScale * 0.4f);
         }
     }
     #endregion
