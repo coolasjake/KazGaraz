@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class SimpleTile : MonoBehaviour
 {
-    public static int widthInCells = 11;
-    public static int heightInCells = 7;
+    public static int widthInCells = 20;
+    public static int heightInCells = 12;
 
     [SerializeField]
     private bool showGizmos = false;
