@@ -26,6 +26,8 @@ public class Controller : MonoBehaviour
     public int beatsPerPlayerMove = 2;
     public int beatsPerEnemyMove = 4;
     public const float gridScale = 0.5f;
+    [Range(0.01f, 0.5f)]
+    private const float relativeNodeRadius = 0.3f;
 
     public GameObject defaultTile;
 
@@ -72,6 +74,15 @@ public class Controller : MonoBehaviour
             beatsPerEnemyMove = 4;
 
         GenerateStartingTiles();
+
+
+        player.transform.position = chunks[0].holder.position + Vector3.right * (chunks[0].endSlot.x + 0.5f) * SimpleTile.widthInCells * gridScale;
+        player.transform.position += Vector3.up * gridScale * 0.5f;
+        if (SimpleTile.widthInCells % 2 == 0)
+            player.transform.position += Vector3.right * gridScale * 0.5f;
+        
+        //Place the camera two tiles above the player so it can move and imply the motion
+        unroundedCamPos = player.transform.position + Vector3.up * SimpleTile.heightInCells * gridScale * 2f;
 
         testEnemy.transform.position = player.transform.position + (Vector3.up * gridScale * SimpleTile.heightInCells * 2);
         enemies.Add(testEnemy);
@@ -221,7 +232,7 @@ public class Controller : MonoBehaviour
 
     private bool MovePlayer(Vector3 movement)
     {
-        if (!Physics2D.OverlapPoint(player.transform.position + movement, wallLayers))
+        if (NoCollisionAtPoint(player.transform.position + movement))
             player.transform.position += movement;
         else
             return false;
@@ -235,6 +246,11 @@ public class Controller : MonoBehaviour
         }
 
         return true;
+    }
+
+    private bool NoCollisionAtPoint(Vector3 pos)
+    {
+        return !Physics2D.OverlapCircle(pos, gridScale * relativeNodeRadius, wallLayers);
     }
 
     private Vector2 DeltaToMove(Vector2 delta)
@@ -315,11 +331,6 @@ public class Controller : MonoBehaviour
         CreateCapChunk();
         GenerateTileChunk();
         GenerateTileChunk();
-
-        //Place the player in the first tile of the first chunk
-        player.transform.position = chunks[0].slots[chunks[0].startSlot.x, chunks[0].startSlot.y].transform.position;
-        //Place the camera two tiles above the player so it can move and imply the motion
-        unroundedCamPos = player.transform.position + Vector3.up * SimpleTile.heightInCells * gridScale * 2f;
     }
 
     private void CreateCapChunk()
@@ -365,7 +376,7 @@ public class Controller : MonoBehaviour
 
         FillChunkWithTiles(thisChunk, connectionsMatrix);
 
-        thisChunk.GenerateNodes();
+        GenerateNodesForChunk(thisChunk);
 
         chunks.Add(thisChunk);
     }
@@ -468,7 +479,7 @@ public class Controller : MonoBehaviour
 
         FillChunkWithTiles(thisChunk, connectionsMatrix);
 
-        thisChunk.GenerateNodes();
+        GenerateNodesForChunk(thisChunk);
 
         int numRecords = 0;
         for (int i = 0; i < Chunk.Width * Chunk.Height * 5; ++i)
@@ -717,24 +728,6 @@ public class Controller : MonoBehaviour
             holder.position = pos;
         }
 
-        public void GenerateNodes()
-        {
-            nodes = new bool[slots.GetLength(0) * SimpleTile.widthInCells, slots.GetLength(1) * SimpleTile.heightInCells];
-
-            Vector2 origin = (Vector2)holder.position + Vector2.one * gridScale * 0.5f;
-            for (int y = 0; y < nodes.GetLength(1); ++y)
-            {
-                for (int x = 0; x < nodes.GetLength(0); ++x)
-                {
-                    if (!Physics2D.OverlapPoint(origin + new Vector2(x, y) * gridScale))
-                        nodes[x, y] = true;
-                }
-            }
-
-            bottomConnectNode = new Vector2Int(Mathf.FloorToInt((endSlot.x + 0.5f) * SimpleTile.widthInCells), 0);
-            topConnectNode = new Vector2Int(Mathf.FloorToInt((startSlot.x + 0.5f) * SimpleTile.widthInCells), nodes.GetLength(1));
-        }
-
         public void TempDrawNodes()
         {
             Gizmos.color = Color.red;
@@ -753,6 +746,24 @@ public class Controller : MonoBehaviour
         {
 
         }
+    }
+
+    public void GenerateNodesForChunk(Chunk chunk)
+    {
+        chunk.nodes = new bool[chunk.slots.GetLength(0) * SimpleTile.widthInCells, chunk.slots.GetLength(1) * SimpleTile.heightInCells];
+
+        Vector2 origin = (Vector2)chunk.holder.position + Vector2.one * gridScale * 0.5f;
+        for (int y = 0; y < chunk.nodes.GetLength(1); ++y)
+        {
+            for (int x = 0; x < chunk.nodes.GetLength(0); ++x)
+            {
+                if (NoCollisionAtPoint(origin + new Vector2(x, y) * gridScale))
+                    chunk.nodes[x, y] = true;
+            }
+        }
+
+        chunk.bottomConnectNode = new Vector2Int(Mathf.FloorToInt((chunk.endSlot.x + 0.5f) * SimpleTile.widthInCells), 0);
+        chunk.topConnectNode = new Vector2Int(Mathf.FloorToInt((chunk.startSlot.x + 0.5f) * SimpleTile.widthInCells), chunk.nodes.GetLength(1));
     }
     #endregion
 
