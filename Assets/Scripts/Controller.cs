@@ -11,16 +11,23 @@ public class Controller : MonoBehaviour
     public Transform cameraTansform;
     public GridPlayer player;
     public Enemy testEnemy;
+    public GameObject recordPre;
     public Text scoreText;
+    public RectTransform gameOverScreen;
     public AnimationCurve cameraSpeedCurve = new AnimationCurve();
+    public LayerMask wallLayers;
+    public LayerMask recordLayer;
     public bool startInMiddle = false;
+    public bool giveTempoScore = false;
     [Min(3)]
     public int maxChunks = 3;
-    public float musicBeatRate = 0.246f;
+    public float musicBeatRate = 0.245942f;
     public float firstBeat = 0.5f;
     public int beatsPerPlayerMove = 2;
     public int beatsPerEnemyMove = 4;
     public const float gridScale = 0.5f;
+    [Range(0.01f, 0.5f)]
+    private const float relativeNodeRadius = 0.3f;
 
     public GameObject defaultTile;
 
@@ -34,14 +41,12 @@ public class Controller : MonoBehaviour
     public Vector2 beatsOrigin = new Vector2();
 
     public List<float> beatTimes = new List<float>();
-    public List<Vector2Int> brokenPathVals = new List<Vector2Int>();
-    private bool pathIsBroken = false;
     #endregion
 
     #region Controller Variables
     private List<SimpleTile>[] sortedTiles = new List<SimpleTile>[4];
     
-    private bool playerDead = false;
+    private bool gameOver = false;
     private float nextBeat = 0;
     private int nextManualBeat = 0;
     private int numBeats = 0;
@@ -59,33 +64,48 @@ public class Controller : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        gameOverScreen.gameObject.SetActive(false);
         SortTilePrefabs();
         musicPlayer = GetComponent<AudioSource>();
-        nextBeat = firstBeat;
 
         if (easyMode)
             beatsPerEnemyMove = 2;
         else
             beatsPerEnemyMove = 4;
 
-        testEnemy.transform.position = player.transform.position + (Vector3.up * gridScale * 2);
-        enemies.Add(testEnemy);
-
         GenerateStartingTiles();
+
+
+        player.transform.position = chunks[0].holder.position + Vector3.right * (chunks[0].endSlot.x + 0.5f) * SimpleTile.widthInCells * gridScale;
+        player.transform.position += Vector3.up * gridScale * 0.5f;
+        if (SimpleTile.widthInCells % 2 == 0)
+            player.transform.position += Vector3.right * gridScale * 0.5f;
+        
+        //Place the camera two tiles above the player so it can move and imply the motion
+        unroundedCamPos = player.transform.position + Vector3.up * SimpleTile.heightInCells * gridScale * 2f;
+
+        testEnemy.transform.position = player.transform.position + (Vector3.up * gridScale * SimpleTile.heightInCells * 2);
+        enemies.Add(testEnemy);
     }
 
     // Update is called once per frame
     void Update()
     {
         if (!musicPlayer.isPlaying && Time.time >= firstBeat)
+        {
             musicPlayer.Play();
+            nextBeat = 0;
+        }
+
+        if (gameOver)
+            return;
 
         if (musicPlayer.time >= nextBeat)
         {
             nextBeat += musicBeatRate;
             numBeats += 1;
             if (easyMode && beatsPerPlayerMove != 0 && numBeats % beatsPerPlayerMove == 0)
-                player.FixedMove();
+                PlayerHoldToMove();
 
             if (player.transform.position.y < chunks[chunks.Count - 2].holder.position.y)
                 GenerateTileChunk();
@@ -107,7 +127,7 @@ public class Controller : MonoBehaviour
         MoveCameraToPlayer();
 
         if (!easyMode)
-            PlayerMoveAndScore();
+            PlayerTapToMove();
     }
 
     private void OnDrawGizmos()
@@ -123,8 +143,6 @@ public class Controller : MonoBehaviour
             }
             DrawPlayerAndMouseNodes();
         }
-
-        DrawBrokenPath();
     }
 
     void AnalyzeBeats()
@@ -175,49 +193,89 @@ public class Controller : MonoBehaviour
     #endregion
 
     #region Player and Enemies
-    private void PlayerMoveAndScore()
+    private void PlayerTapToMove()
     {
-
         if (Input.GetMouseButtonDown(0))
         {
             Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             Vector2 delta = mousePos - player.transform.position;
 
-            Vector3 move = Vector2.zero;
-            //If the tap was not too close to the player
-            if (delta.sqrMagnitude > Mathf.Pow(gridScale * 3f, 2))
+            Vector3 move = DeltaToMove(delta) * gridScale;
+
+            if (MovePlayer(move))
             {
-                if (delta.x > delta.y) //Right or Down
+                if (giveTempoScore)
                 {
-                    if (delta.x > -delta.y) //Right
-                        move = Vector2.right;
-                    else //Down
-                        move = Vector2.down;
+                    //Score the move
+                    float diff = nextBeat - musicPlayer.time;
+                    float moveScore = ((musicBeatRate / 5) - Mathf.PingPong(diff, musicBeatRate / 2)) / (musicBeatRate / 5);
+                    moveScore = Mathf.Floor(moveScore * 100);
+                    score += moveScore;
+                    scoreText.text = score.ToString();
                 }
-                else //Up or Left
-                {
-                    if (delta.x > -delta.y) //Up
-                        move = Vector2.up;
-                    else //Left
-                        move = Vector2.left;
-                }
-            }
-
-            move *= gridScale;
-
-            if (!Physics2D.OverlapPoint(player.transform.position + move))
-            {
-                player.transform.position += move;
-
-                //Score the move
-                float diff = nextBeat - musicPlayer.time;
-                float moveScore = ((musicBeatRate / 5) - Mathf.PingPong(diff, musicBeatRate / 2)) / (musicBeatRate / 5);
-                moveScore = Mathf.Floor(moveScore * 100);
-                //Debug.Log("Diff = " + diff + ", Score = " + moveScore);
-                score += moveScore;
-                scoreText.text = score.ToString();
             }
         }
+    }
+
+    private void PlayerHoldToMove()
+    {
+        if (Input.GetMouseButton(0))
+        {
+            Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            Vector2 delta = mousePos - player.transform.position;
+            
+            Vector3 move = DeltaToMove(delta) * gridScale;
+
+            MovePlayer(move);
+        }
+    }
+
+    private bool MovePlayer(Vector3 movement)
+    {
+        if (NoCollisionAtPoint(player.transform.position + movement))
+            player.transform.position += movement;
+        else
+            return false;
+
+        Collider2D record = Physics2D.OverlapPoint(player.transform.position, recordLayer);
+        if (record)
+        {
+            score += 100;
+            scoreText.text = score.ToString();
+            Destroy(record.gameObject);
+        }
+
+        return true;
+    }
+
+    private bool NoCollisionAtPoint(Vector3 pos)
+    {
+        return !Physics2D.OverlapCircle(pos, gridScale * relativeNodeRadius, wallLayers);
+    }
+
+    private Vector2 DeltaToMove(Vector2 delta)
+    {
+        Vector2 move = Vector2.zero;
+
+        //If the tap was not too close to the origin
+        if (delta.sqrMagnitude > Mathf.Pow(gridScale * 3f, 2))
+        {
+            if (delta.x > delta.y) //Right or Down
+            {
+                if (delta.x > -delta.y) //Right
+                    move = Vector2.right;
+                else //Down
+                    move = Vector2.down;
+            }
+            else //Up or Left
+            {
+                if (delta.x > -delta.y) //Up
+                    move = Vector2.up;
+                else //Left
+                    move = Vector2.left;
+            }
+        }
+        return move;
     }
 
     private void MoveEnemies()
@@ -226,7 +284,21 @@ public class Controller : MonoBehaviour
         {
             E.path = GetPathAStar(E.transform.position, player.transform.position);
             E.Move(player.transform.position);
+            if (Vector2.Distance(E.transform.position, player.transform.position) < gridScale)
+                GameOver();
         }
+    }
+
+    private void GameOver()
+    {
+        gameOver = true;
+
+        gameOverScreen.gameObject.SetActive(true);
+    }
+
+    public void BackToMenu()
+    {
+        UnityEngine.SceneManagement.SceneManager.LoadScene(0);
     }
     #endregion
 
@@ -259,11 +331,6 @@ public class Controller : MonoBehaviour
         CreateCapChunk();
         GenerateTileChunk();
         GenerateTileChunk();
-
-        //Place the player in the first tile of the first chunk
-        player.transform.position = chunks[0].slots[chunks[0].startSlot.x, chunks[0].startSlot.y].transform.position;
-        //Place the camera two tiles above the player so it can move and imply the motion
-        cameraTansform.position = player.transform.position + Vector3.up * SimpleTile.heightInCells * gridScale * 2f;
     }
 
     private void CreateCapChunk()
@@ -277,9 +344,9 @@ public class Controller : MonoBehaviour
         thisChunk.startSlot = new Vector2Int(startingTile, 0);
         thisChunk.endSlot = new Vector2Int(startingTile, 0);
 
-        thisChunk.slots = new SimpleTile[Chunk.Width, 1];
+        thisChunk.slots = new SimpleTile[Chunk.Width, 3];
 
-        bool[,][] connectionsMatrix = new bool[Chunk.Width, 1][];
+        bool[,][] connectionsMatrix = new bool[Chunk.Width, 3][];
         bool lastTileWantsConnection = false;
         for (int x = 0; x < Chunk.Width; ++x)
         {
@@ -296,9 +363,20 @@ public class Controller : MonoBehaviour
             }
         }
 
+        for (int x = 0; x < Chunk.Width; ++x)
+            connectionsMatrix[x, 1] = new bool[4];
+
+        for (int x = 0; x < Chunk.Width; ++x)
+            connectionsMatrix[x, 2] = new bool[4];
+
+        connectionsMatrix[startingTile, 0][(int)Dir.top] = true;
+        connectionsMatrix[startingTile, 1][(int)Dir.bottom] = true;
+        connectionsMatrix[startingTile, 1][(int)Dir.top] = true;
+        connectionsMatrix[startingTile, 2][(int)Dir.bottom] = true;
+
         FillChunkWithTiles(thisChunk, connectionsMatrix);
 
-        thisChunk.GenerateNodes();
+        GenerateNodesForChunk(thisChunk);
 
         chunks.Add(thisChunk);
     }
@@ -401,7 +479,20 @@ public class Controller : MonoBehaviour
 
         FillChunkWithTiles(thisChunk, connectionsMatrix);
 
-        thisChunk.GenerateNodes();
+        GenerateNodesForChunk(thisChunk);
+
+        int numRecords = 0;
+        for (int i = 0; i < Chunk.Width * Chunk.Height * 5; ++i)
+        {
+            Vector2Int randomPos = new Vector2Int(Random.Range(0, SimpleTile.widthInCells * Chunk.Width), Random.Range(0, SimpleTile.heightInCells * Chunk.Height));
+            if (thisChunk.nodes[randomPos.x, randomPos.y] == true)
+            {
+                numRecords += 1;
+                Instantiate(recordPre, (Vector2)thisChunk.holder.position + (Vector2)randomPos * gridScale + Vector2.one * gridScale * 0.5f, Quaternion.identity, thisChunk.holder);
+                if (numRecords >= Chunk.Width * Chunk.Height)
+                    break;
+            }
+        }
 
         chunks.Add(thisChunk);
 
@@ -455,9 +546,6 @@ public class Controller : MonoBehaviour
 
     private Dir[] GenerateRandomChunkPath(Vector2Int startSlot, Vector2Int endSlot)
     {
-        if (pathIsBroken)
-            return new Dir[] { Dir.bottom };
-
         List<Dir> path = new List<Dir>();
         bool[,] env = new bool[Chunk.Width, Chunk.Height];
 
@@ -466,9 +554,6 @@ public class Controller : MonoBehaviour
 
         List<Dir> options = new List<Dir>();
         List<Vector2Int> nodes = new List<Vector2Int>();
-        
-        pathIsBroken = true;
-        brokenPathVals.Add(currentTile);
 
         int maxLoops = 1000;
         while (--maxLoops > 0)
@@ -545,7 +630,6 @@ public class Controller : MonoBehaviour
                 {
                     path.Add(options[choice]);
                     currentTile += options[choice].ToOffset();
-                    brokenPathVals.Add(currentTile);
                     env[currentTile.x, currentTile.y] = true;
                     break;
                 }
@@ -553,9 +637,6 @@ public class Controller : MonoBehaviour
                     options.RemoveAt(choice);
             }
         }
-
-        pathIsBroken = false;
-        brokenPathVals.Clear();
 
         //Return the path.
 
@@ -647,24 +728,6 @@ public class Controller : MonoBehaviour
             holder.position = pos;
         }
 
-        public void GenerateNodes()
-        {
-            nodes = new bool[slots.GetLength(0) * SimpleTile.widthInCells, slots.GetLength(1) * SimpleTile.heightInCells];
-
-            Vector2 origin = (Vector2)holder.position + Vector2.one * gridScale * 0.5f;
-            for (int y = 0; y < nodes.GetLength(1); ++y)
-            {
-                for (int x = 0; x < nodes.GetLength(0); ++x)
-                {
-                    if (!Physics2D.OverlapPoint(origin + new Vector2(x, y) * gridScale))
-                        nodes[x, y] = true;
-                }
-            }
-
-            bottomConnectNode = new Vector2Int(Mathf.FloorToInt((endSlot.x + 0.5f) * SimpleTile.widthInCells), 0);
-            topConnectNode = new Vector2Int(Mathf.FloorToInt((startSlot.x + 0.5f) * SimpleTile.widthInCells), nodes.GetLength(1));
-        }
-
         public void TempDrawNodes()
         {
             Gizmos.color = Color.red;
@@ -683,6 +746,24 @@ public class Controller : MonoBehaviour
         {
 
         }
+    }
+
+    public void GenerateNodesForChunk(Chunk chunk)
+    {
+        chunk.nodes = new bool[chunk.slots.GetLength(0) * SimpleTile.widthInCells, chunk.slots.GetLength(1) * SimpleTile.heightInCells];
+
+        Vector2 origin = (Vector2)chunk.holder.position + Vector2.one * gridScale * 0.5f;
+        for (int y = 0; y < chunk.nodes.GetLength(1); ++y)
+        {
+            for (int x = 0; x < chunk.nodes.GetLength(0); ++x)
+            {
+                if (NoCollisionAtPoint(origin + new Vector2(x, y) * gridScale))
+                    chunk.nodes[x, y] = true;
+            }
+        }
+
+        chunk.bottomConnectNode = new Vector2Int(Mathf.FloorToInt((chunk.endSlot.x + 0.5f) * SimpleTile.widthInCells), 0);
+        chunk.topConnectNode = new Vector2Int(Mathf.FloorToInt((chunk.startSlot.x + 0.5f) * SimpleTile.widthInCells), chunk.nodes.GetLength(1));
     }
     #endregion
 
@@ -879,20 +960,6 @@ public class Controller : MonoBehaviour
             }
         }
     }
-    private void DrawBrokenPath()
-    {
-        if (chunks.Count < 1 || pathIsBroken == false)
-            return;
-        Vector2 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        Vector2 origin = Vector2Int.zero;
-        origin = chunks[chunks.Count - 1].holder.position;
-        Vector2 tileSize = new Vector2(SimpleTile.widthInCells * gridScale, SimpleTile.heightInCells * gridScale);
-
-        foreach (Vector2Int tile in brokenPathVals)
-        {
-            Gizmos.DrawSphere(origin + (Vector2)tile * tileSize + tileSize * 0.5f, gridScale * 0.4f);
-        }
-    }
     #endregion
 
     #region Camera
@@ -915,40 +982,7 @@ public class Controller : MonoBehaviour
         float distToPlayer = Vector2.Distance(cameraTansform.position, player.transform.position);
         float targetSpeed = cameraSpeedCurve.Evaluate(distToPlayer);
         unroundedCamPos = Vector2.MoveTowards(unroundedCamPos, player.transform.position, targetSpeed * Time.deltaTime);
-        //cameraTansform.position = RoundToNearestPixel(unroundedCamPos, Camera.main);
-        cameraTansform.position = unroundedCamPos;
-    }
-    #endregion
-
-    #region Steady Downwards Camera [Depreciated]
-    private float cameraFallSpeed = 1;
-    private float speedNearBottomFactor = 2;
-    private float speedIncreaseRate = 0.01f;
-    private float levelBottom = 5;
-    private float levelSide = 3;
-    private float deathHeight = 7;
-    private void MoveCameraDown()
-    {
-        if (playerDead || player.transform.position.y > cameraTansform.position.y + deathHeight)
-        {
-            if (!playerDead)
-            {
-                Debug.Log("Player is dead!!!");
-                playerDead = true;
-            }
-            return;
-        }
-
-        //If player near bottom go down faster.
-        float distFromBottom = player.transform.position.y - (cameraTansform.position.y - levelBottom);
-        float speedFactor = 1 + (levelBottom - distFromBottom) / levelBottom;
-        //Debug.Log("Dist = " + distFromBottom + ", factor = " + speedFactor);
-        cameraTansform.position += new Vector3(0, -cameraFallSpeed * speedFactor * Time.deltaTime);
-
-        //if (cameraTansform.position.y <= (-_nextY + startNumRows) * blockSize)
-        //    GenerateRow();
-
-        cameraFallSpeed += speedIncreaseRate * Time.deltaTime;
+        cameraTansform.position = RoundToNearestPixel(unroundedCamPos, Camera.main);
     }
     #endregion
 }
