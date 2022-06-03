@@ -13,6 +13,7 @@ public class Controller : MonoBehaviour
     public Enemy testEnemy;
     public GameObject recordPre;
     public Text scoreText;
+    public RectTransform introScreen;
     public RectTransform gameOverScreen;
     public AnimationCurve cameraSpeedCurve = new AnimationCurve();
     public LayerMask wallLayers;
@@ -45,7 +46,8 @@ public class Controller : MonoBehaviour
 
     #region Controller Variables
     private List<SimpleTile>[] sortedTiles = new List<SimpleTile>[4];
-    
+
+    private bool gameStarted = false;
     private bool gameOver = false;
     private float nextBeat = 0;
     private int nextManualBeat = 0;
@@ -83,6 +85,7 @@ public class Controller : MonoBehaviour
         
         //Place the camera two tiles above the player so it can move and imply the motion
         unroundedCamPos = player.transform.position + Vector3.up * SimpleTile.heightInCells * gridScale * 2f;
+        cameraTansform.position = unroundedCamPos;
 
         testEnemy.transform.position = player.transform.position + (Vector3.up * gridScale * SimpleTile.heightInCells * 2);
         enemies.Add(testEnemy);
@@ -91,6 +94,17 @@ public class Controller : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (!gameStarted)
+        {
+            if (Input.GetMouseButtonDown(0))
+            {
+                introScreen.gameObject.SetActive(false);
+                gameStarted = true;
+            }
+            return;
+        }
+
+
         if (!musicPlayer.isPlaying && Time.time >= firstBeat)
         {
             musicPlayer.Play();
