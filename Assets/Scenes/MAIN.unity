@@ -1313,6 +1313,8 @@ MonoBehaviour:
   scoreText: {fileID: 43882563}
   introScreen: {fileID: 612086137}
   gameOverScreen: {fileID: 534135588}
+  gameOverText: {fileID: 1847804231}
+  recordScratch: {fileID: 8300000, guid: c2abfeba39c9f154ba86db3533b8495d, type: 3}
   cameraSpeedCurve:
     serializedVersion: 2
     m_Curve:
@@ -1346,10 +1348,12 @@ MonoBehaviour:
   startInMiddle: 0
   giveTempoScore: 0
   maxChunks: 3
-  musicBeatRate: 0.24594195
-  firstBeat: 2
-  beatsPerPlayerMove: 2
+  musicBeatRate: 0.491884
+  beatsBeforeEnemyMoves: 3
+  musicDelay: 0.5
+  beatsPerPlayerMove: 1
   beatsPerEnemyMove: 4
+  enemyMovesOnOffBeats: 1
   defaultTile: {fileID: 8504488222562632678, guid: f7518811c22c1ea4f8098c1a36969a1c, type: 3}
   tilesPath: Prefabs/Tiles/
   tilePrefabs: []
@@ -1390,7 +1394,7 @@ AudioSource:
   m_PlayOnAwake: 0
   m_Volume: 1
   m_Pitch: 1
-  Loop: 1
+  Loop: 0
   Mute: 0
   Spatialize: 0
   SpatializePostEffects: 0

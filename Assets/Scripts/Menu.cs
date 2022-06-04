@@ -48,13 +48,13 @@ public class Menu : MonoBehaviour
 
     public void Easy()
     {
-        Controller.easyMode = true;
+        Controller.holdToMoveMode = true;
         SceneManager.LoadScene(1);
     }
 
     public void Hard()
     {
-        Controller.easyMode = false;
+        Controller.holdToMoveMode = false;
         SceneManager.LoadScene(1);
     }
 }

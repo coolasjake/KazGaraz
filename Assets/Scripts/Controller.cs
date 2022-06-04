@@ -6,7 +6,7 @@ using UnityEngine.UI;
 public class Controller : MonoBehaviour
 {
     #region Settings and References
-    public static bool easyMode = false;
+    public static bool holdToMoveMode = true;
 
     public Transform cameraTansform;
     public GridPlayer player;
@@ -15,6 +15,8 @@ public class Controller : MonoBehaviour
     public Text scoreText;
     public RectTransform introScreen;
     public RectTransform gameOverScreen;
+    public Text gameOverText;
+    public AudioClip recordScratch;
     public AnimationCurve cameraSpeedCurve = new AnimationCurve();
     public LayerMask wallLayers;
     public LayerMask recordLayer;
@@ -23,9 +25,12 @@ public class Controller : MonoBehaviour
     [Min(3)]
     public int maxChunks = 3;
     public float musicBeatRate = 0.245942f;
-    public float firstBeat = 0.5f;
+    public int beatsBeforeEnemyMoves = 3;
+    public float musicDelay = 0.5f;
     public int beatsPerPlayerMove = 2;
     public int beatsPerEnemyMove = 4;
+    [Tooltip("Example: If you have 4 beats per enemy move, then: TRUE = enemy will move on 2, 3, and 4. FALSE = enemy will move on 1 only.")]
+    public bool enemyMovesOnOffBeats = true;
     public const float gridScale = 0.5f;
     [Range(0.01f, 0.5f)]
     private const float relativeNodeRadius = 0.3f;
@@ -70,13 +75,7 @@ public class Controller : MonoBehaviour
         SortTilePrefabs();
         musicPlayer = GetComponent<AudioSource>();
 
-        if (easyMode)
-            beatsPerEnemyMove = 2;
-        else
-            beatsPerEnemyMove = 4;
-
         GenerateStartingTiles();
-
 
         player.transform.position = chunks[0].holder.position + Vector3.right * (chunks[0].endSlot.x + 0.5f) * SimpleTile.widthInCells * gridScale;
         player.transform.position += Vector3.up * gridScale * 0.5f;
@@ -100,47 +99,49 @@ public class Controller : MonoBehaviour
             {
                 introScreen.gameObject.SetActive(false);
                 gameStarted = true;
+                musicPlayer.Play();
+                nextBeat = Time.time;
+                numBeats = -beatsBeforeEnemyMoves;
             }
             return;
-        }
-
-
-        if (!musicPlayer.isPlaying && Time.time >= firstBeat)
-        {
-            musicPlayer.Play();
-            nextBeat = 0;
         }
 
         if (gameOver)
             return;
 
-        if (musicPlayer.time >= nextBeat)
+        if (!musicPlayer.isPlaying)
+        {
+            Debug.Log("Sound Finished");
+            GameOver(true);
+        }
+
+        if (Time.time >= nextBeat)
         {
             nextBeat += musicBeatRate;
             numBeats += 1;
-            if (easyMode && beatsPerPlayerMove != 0 && numBeats % beatsPerPlayerMove == 0)
+            if (holdToMoveMode && beatsPerPlayerMove != 0 && numBeats % beatsPerPlayerMove == 0)
                 PlayerHoldToMove();
 
             if (player.transform.position.y < chunks[chunks.Count - 2].holder.position.y)
                 GenerateTileChunk();
 
-            if (easyMode == true)
+            if (enemyMovesOnOffBeats == true)
             {
-                //Move on main-beats (only first in set)
-                if (beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove == 0)
+                //Move on off-beats (all beats except first)
+                if (numBeats > 0 && beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove != 0)
                     MoveEnemies();
             }
             else
             {
-                //Move on off-beats (all beats except first)
-                if (beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove != 0)
+                //Move on main-beats (only first in set)
+                if (numBeats > 0 && beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove == 0)
                     MoveEnemies();
             }
         }
 
         MoveCameraToPlayer();
 
-        if (!easyMode)
+        if (!holdToMoveMode)
             PlayerTapToMove();
     }
 
@@ -299,15 +300,28 @@ public class Controller : MonoBehaviour
             E.path = GetPathAStar(E.transform.position, player.transform.position);
             E.Move(player.transform.position);
             if (Vector2.Distance(E.transform.position, player.transform.position) < gridScale)
-                GameOver();
+                GameOver(false);
         }
     }
 
-    private void GameOver()
+    private void GameOver(bool goodEnding)
     {
         gameOver = true;
-
         gameOverScreen.gameObject.SetActive(true);
+
+        if (goodEnding)
+        {
+            gameOverText.text = "You survived for the whole song!!!";
+            score += 1000;
+            musicPlayer.volume = musicPlayer.volume * 0.4f;
+            musicPlayer.Play();
+        }
+        else
+        {
+            //gameOverText.text = "You got caught!";
+            musicPlayer.clip = recordScratch;
+            musicPlayer.loop = false;
+        }
     }
 
     public void BackToMenu()
