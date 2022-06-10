@@ -1,0 +1,22 @@
+fileFormatVersion: 2
+guid: a813274fe6406174da8e4ec8a41d8223
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontNames:
+  - Magneto
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: a5371e30e746d54499df792a63e04338, type: 3}
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
