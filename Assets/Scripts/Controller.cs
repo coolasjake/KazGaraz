@@ -8,36 +8,47 @@ public class Controller : MonoBehaviour
     #region Settings and References
     public static bool holdToMoveMode = true;
 
+    [Header("References")]
     public Transform cameraTansform;
     public GridPlayer player;
     public Enemy testEnemy;
+    public GameObject enemyPrefab;
     public GameObject recordPre;
     public Text scoreText;
     public RectTransform introScreen;
     public RectTransform gameOverScreen;
     public Text gameOverText;
     public AudioClip recordScratch;
+    public string tilesPath = "/Prefabs/Tiles/";
+
+    [Header("Settings")]
     public AnimationCurve cameraSpeedCurve = new AnimationCurve();
+    [Min(3)]
+    public int maxChunks = 3;
     public LayerMask wallLayers;
     public LayerMask recordLayer;
     public bool startInMiddle = false;
     public bool giveTempoScore = false;
-    [Min(3)]
-    public int maxChunks = 3;
+
+    [Header("Music Settings")]
     public float musicBeatRate = 0.245942f;
+    public float firstBeatTime = 0.22f;
     public int beatsBeforeEnemyMoves = 3;
     public float musicDelay = 0.5f;
     public int beatsPerPlayerMove = 2;
     public int beatsPerEnemyMove = 4;
     [Tooltip("Example: If you have 4 beats per enemy move, then: TRUE = enemy will move on 2, 3, and 4. FALSE = enemy will move on 1 only.")]
     public bool enemyMovesOnOffBeats = true;
+
+    [Header("Enemy Spawning")]
+    public List<int> NumChunksForNewEnemies = new List<int>();
+    public List<int> NumBeatsForNewEnemies = new List<int>();
+
     public const float gridScale = 0.5f;
     [Range(0.01f, 0.5f)]
     private const float relativeNodeRadius = 0.3f;
 
-    public GameObject defaultTile;
-
-    public string tilesPath = "/Prefabs/Tiles/";
+    [Header("Debug Controls")]
     public List<GameObject> tilePrefabs = new List<GameObject>();
     public bool showPathfindingGizmos = false;
     public bool showBeatsAnalysis = false;
@@ -51,6 +62,8 @@ public class Controller : MonoBehaviour
 
     #region Controller Variables
     private List<SimpleTile>[] sortedTiles = new List<SimpleTile>[4];
+
+    private List<GameObject> zeroConnectionTiles = new List<GameObject>();
 
     private bool gameStarted = false;
     private bool gameOver = false;
@@ -73,6 +86,8 @@ public class Controller : MonoBehaviour
     {
         gameOverScreen.gameObject.SetActive(false);
         SortTilePrefabs();
+        //Sort num beats/chunks per enemy //NEEDS IMPROVEMENT HERE
+        //NumBeatsForNewEnemies.Sort(IComparer<int>)
         musicPlayer = GetComponent<AudioSource>();
 
         GenerateStartingTiles();
@@ -86,8 +101,8 @@ public class Controller : MonoBehaviour
         unroundedCamPos = player.transform.position + Vector3.up * SimpleTile.heightInCells * gridScale * 2f;
         cameraTansform.position = unroundedCamPos;
 
-        testEnemy.transform.position = player.transform.position + (Vector3.up * gridScale * SimpleTile.heightInCells * 2);
-        enemies.Add(testEnemy);
+        Vector2 enemyPos = player.transform.position + (Vector3.up * gridScale * SimpleTile.heightInCells * 2);
+        CreateEnemy(enemyPos);
     }
 
     // Update is called once per frame
@@ -100,7 +115,7 @@ public class Controller : MonoBehaviour
                 introScreen.gameObject.SetActive(false);
                 gameStarted = true;
                 musicPlayer.Play();
-                nextBeat = Time.time;
+                nextBeat = Time.time + firstBeatTime;
                 numBeats = -beatsBeforeEnemyMoves;
             }
             return;
@@ -123,7 +138,18 @@ public class Controller : MonoBehaviour
                 PlayerHoldToMove();
 
             if (player.transform.position.y < chunks[chunks.Count - 2].holder.position.y)
-                GenerateTileChunk();
+                GenerateTileAndEnemies();
+
+            if (NumBeatsForNewEnemies.Count > 0)
+            {
+                int nextEnemySpawn = NumBeatsForNewEnemies[0];
+
+                if (numBeats >= nextEnemySpawn)
+                {
+                    NumBeatsForNewEnemies.RemoveAt(0);
+                    CreateEnemy(chunks[0].holder.position); //NEEDS IMPROVEMENT HERE
+                }
+            }
 
             if (enemyMovesOnOffBeats == true)
             {
@@ -154,7 +180,8 @@ public class Controller : MonoBehaviour
         {
             foreach (Chunk c in chunks)
             {
-                c.TempDrawNodes();
+                TempDrawNodesForChunk(c);
+                //c.TempDrawNodes();
             }
             DrawPlayerAndMouseNodes();
         }
@@ -293,6 +320,13 @@ public class Controller : MonoBehaviour
         return move;
     }
 
+    private void CreateEnemy(Vector2 position)
+    {
+        GameObject GO = Instantiate(enemyPrefab, position, Quaternion.identity);
+        Enemy newEnemy = GO.GetComponent<Enemy>();
+        enemies.Add(newEnemy);
+    }
+
     private void MoveEnemies()
     {
         foreach (Enemy E in enemies)
@@ -314,7 +348,6 @@ public class Controller : MonoBehaviour
             gameOverText.text = "You survived for the whole song!!!";
             score += 1000;
             musicPlayer.volume = musicPlayer.volume * 0.4f;
-            musicPlayer.Play();
         }
         else
         {
@@ -322,6 +355,7 @@ public class Controller : MonoBehaviour
             musicPlayer.clip = recordScratch;
             musicPlayer.loop = false;
         }
+        musicPlayer.Play();
     }
 
     public void BackToMenu()
@@ -331,6 +365,22 @@ public class Controller : MonoBehaviour
     #endregion
 
     #region Tiles and Chunks
+    private void GenerateTileAndEnemies()
+    {
+        GenerateTileChunk();
+
+        if (NumChunksForNewEnemies.Count > 0)
+        {
+            int nextChunkSpawn = NumChunksForNewEnemies[0];
+
+            if (numChunks >= nextChunkSpawn)
+            {
+                NumChunksForNewEnemies.RemoveAt(0);
+                CreateEnemy(chunks[chunks.Count - 1].holder.position); //NEEDS IMPROVEMENT HERE
+            }
+        }
+    }
+
     private List<Chunk> chunks = new List<Chunk>();
     private int numChunks = 0;
 
@@ -346,12 +396,23 @@ public class Controller : MonoBehaviour
         foreach (GameObject pre in tilePrefabs)
         {
             SimpleTile tile = pre.GetComponent<SimpleTile>();
+            bool hasAConnection = false;
             for (int i = 0; i < 4; ++i)
             {
                 if (tile.connections[i])
+                {
                     sortedTiles[i].Add(tile);
+                    hasAConnection = true;
+                }
             }
+
+            if (hasAConnection == false)
+                zeroConnectionTiles.Add(pre);
         }
+
+        //Add the first loaded tile if there are no zero-connection tiles (used for a default)
+        if (zeroConnectionTiles.Count == 0)
+            zeroConnectionTiles.Add(tilePrefabs[0]);
     }
     
     private void GenerateStartingTiles()
@@ -703,11 +764,12 @@ public class Controller : MonoBehaviour
             }
         }
 
+        int randomIndex = Random.Range(0, zeroConnectionTiles.Count);
+        GameObject chosenTile = zeroConnectionTiles[randomIndex];
         if (entrance == -1 || entrance > sortedTiles[entrance].Count)
-            return defaultTile;
+            return chosenTile;
 
         bool foundPerfectTile = false;
-        GameObject chosenTile = defaultTile;
         foreach (SimpleTile tilePre in sortedTiles[entrance])
         {
             bool isAMatch = true;
@@ -756,23 +818,31 @@ public class Controller : MonoBehaviour
             holder.position = pos;
         }
 
-        public void TempDrawNodes()
-        {
-            Gizmos.color = Color.red;
-            Vector2 origin = (Vector2)holder.position + Vector2.one * gridScale * 0.5f;
-            for (int x = 0; x < nodes.GetLength(0); ++x)
-            {
-                for (int y = 0; y < nodes.GetLength(1); ++y)
-                {
-                    if (nodes[x, y])
-                        Gizmos.DrawSphere(origin + new Vector2(x, y) * gridScale, gridScale * 0.1f);
-                }
-            }
-        }
-
         public void TempDrawExits()
         {
 
+        }
+    }
+
+    public void TempDrawNodesForChunk(Chunk chunk)
+    {
+        Gizmos.color = Color.red;
+        Vector2 origin = (Vector2)chunk.holder.position + Vector2.one * gridScale * 0.5f;
+        for (int x = 0; x < chunk.nodes.GetLength(0); ++x)
+        {
+            for (int y = 0; y < chunk.nodes.GetLength(1); ++y)
+            {
+                if (chunk.nodes[x, y])
+                {
+                    /*
+                    if (HasPathAStar(chunk, new Vector2Int(x, y)))
+                        Gizmos.color = Color.red;
+                    else
+                        Gizmos.color = Color.yellow;
+                    */
+                    Gizmos.DrawSphere(origin + new Vector2(x, y) * gridScale, gridScale * 0.1f);
+                }
+            }
         }
     }
 
@@ -786,9 +856,21 @@ public class Controller : MonoBehaviour
             for (int x = 0; x < chunk.nodes.GetLength(0); ++x)
             {
                 if (NoCollisionAtPoint(origin + new Vector2(x, y) * gridScale))
+                {
                     chunk.nodes[x, y] = true;
+                }
             }
         }
+        /*
+        for (int y = 0; y < chunk.nodes.GetLength(1); ++y)
+        {
+            for (int x = 0; x < chunk.nodes.GetLength(0); ++x)
+            {
+                if (chunk.nodes[x,y] == true && !HasPathAStar(chunk, new Vector2Int(x, y)))
+                    chunk.nodes[x, y] = false;
+            }
+        }
+        */
 
         chunk.bottomConnectNode = new Vector2Int(Mathf.FloorToInt((chunk.endSlot.x + 0.5f) * SimpleTile.widthInCells), 0);
         chunk.topConnectNode = new Vector2Int(Mathf.FloorToInt((chunk.startSlot.x + 0.5f) * SimpleTile.widthInCells), chunk.nodes.GetLength(1));
@@ -801,7 +883,7 @@ public class Controller : MonoBehaviour
 
     private Dir[] GetPathAStar(Vector2 startPos, Vector2 goal)
     {
-        bool[,] env = new bool[1, 1];
+        bool[,] env = new bool[Chunk.Width * SimpleTile.widthInCells, Chunk.Height * SimpleTile.heightInCells];
 
         Vector2 origin;
         Vector2Int nodeStart = Vector2Int.zero;
@@ -812,7 +894,13 @@ public class Controller : MonoBehaviour
                 continue;
             else
             {
-                env = c.nodes;
+                for (int y = 0; y < c.nodes.GetLength(1); ++y)
+                {
+                    for (int x = 0; x < c.nodes.GetLength(0); ++x)
+                    {
+                        env[x, y] = c.nodes[x, y];
+                    }
+                }
                 origin = c.holder.position;
 
                 nodeStart = ((startPos - origin) / gridScale).FloorToV2Int();
@@ -840,6 +928,20 @@ public class Controller : MonoBehaviour
                 }
                 else
                     nodeGoal = ((goal - origin) / gridScale).FloorToV2Int();
+
+                //For each enemy, check if it is in the chunk, then change the node it is on to blocked (false) so enemies take different paths to each other
+                foreach (Enemy E in enemies)
+                {
+                    if (E.transform.position.y >= c.holder.position.y &&
+                        E.transform.position.y <= c.holder.position.y + Chunk.Height * SimpleTile.heightInCells * gridScale)
+                    {
+                        Vector2Int enemyNode = (((Vector2)E.transform.position - origin) / gridScale).FloorToV2Int();
+                        if (enemyNode.x >= env.GetLength(0) || enemyNode.x < 0 ||
+                            enemyNode.y >= env.GetLength(1) || enemyNode.y < 0)
+                            continue;
+                        env[enemyNode.x, enemyNode.y] = false;
+                    }
+                }
 
                 break;
             }
@@ -889,7 +991,6 @@ public class Controller : MonoBehaviour
                         while (index > 0 && newNode.H < nodeQueue[index].H)
                             --index;
                         nodeQueue.Insert(index + 1, newNode);
-                        //nodeQueue.Add(new Node(offset, (Dir)dir, currentNode.stepsFromStart + 1, Cost(offset, nodeGoal), nodeIndex));
                     }
                 }
             }
@@ -907,6 +1008,69 @@ public class Controller : MonoBehaviour
         }
 
         return path.ToArray();
+    }
+
+    private bool HasPathAStar(Chunk c, Vector2 goalPos)
+    {
+        Vector2Int goalNode = Vector2Int.zero;
+        if (goalPos.y < c.holder.position.y)
+            return false;
+        else if (goalPos.y > c.holder.position.y + Chunk.Height * SimpleTile.heightInCells * gridScale)
+            return false;
+        else
+            goalNode = ((goalPos - (Vector2)c.holder.position) / gridScale).FloorToV2Int();
+
+        return HasPathAStar(c, goalNode);
+    }
+
+    private bool HasPathAStar(Chunk c, Vector2Int goalNode)
+    {
+        bool[,] env = c.nodes;
+        bool foundGoal = false;
+        int nodeIndex = 0;
+        nodeQueue.Clear();
+        nodeQueue.Add(new Node(c.topConnectNode, Dir.bottom, 0, Cost(c.topConnectNode, goalNode), -1));
+        triedNodes.Clear();
+
+        int counter = 0;
+        while (nodeQueue.Count > 0 && foundGoal == false && counter < 1000)
+        {
+            counter += 1;
+            Node currentNode = nodeQueue[0];
+            //Remove the first node from the list (this node).
+            triedNodes.Add(currentNode);
+            nodeIndex = triedNodes.Count - 1;
+            nodeQueue.RemoveAt(0);
+
+            for (int dir = 0; dir < 4; ++dir)
+            {
+                Vector2Int offset = ((Dir)dir).ToOffset();
+                offset.x += currentNode.pos.x;
+                offset.y += currentNode.pos.y;
+
+                if (offset == goalNode)
+                    return true;
+
+                if (offset.x >= env.GetLength(0) || offset.x < 0 ||
+                    offset.y >= env.GetLength(1) || offset.y < 0)
+                    continue;
+
+                if (env[offset.x, offset.y] == true)
+                {
+                    if (nodeQueue.Find(X => X.pos == offset) == null &&
+                        triedNodes.Find(X => X.pos == offset) == null)
+                    {
+                        Node newNode = new Node(offset, (Dir)dir, currentNode.stepsFromStart + 1, Cost(offset, goalNode), nodeIndex);
+                        int index = nodeQueue.Count - 1;
+                        while (index > 0 && newNode.H < nodeQueue[index].H)
+                            --index;
+                        nodeQueue.Insert(index + 1, newNode);
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     private int Cost(Vector2Int from, Vector2Int to)
