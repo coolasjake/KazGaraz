@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class Enemy : MonoBehaviour
 {
+    public Animator animator;
     public Dir[] path;
 
     public void Move(Vector3 playerPos)
@@ -21,16 +22,28 @@ public class Enemy : MonoBehaviour
                 if (delta.x > delta.y) //Right or Down
                 {
                     if (delta.x > -delta.y) //Right
+                    {
                         move = Vector2.right;
+                        animator.SetInteger("Direction", (int)Dir.right);
+                    }
                     else //Down
+                    {
                         move = Vector2.down;
+                        animator.SetInteger("Direction", (int)Dir.bottom);
+                    }
                 }
                 else //Up or Left
                 {
                     if (delta.x > -delta.y) //Up
+                    {
                         move = Vector2.up;
+                        animator.SetInteger("Direction", (int)Dir.top);
+                    }
                     else //Left
+                    {
                         move = Vector2.left;
+                        animator.SetInteger("Direction", (int)Dir.left);
+                    }
                 }
             }
 

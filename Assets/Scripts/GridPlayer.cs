@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class GridPlayer : MonoBehaviour
 {
+    public Animator animator;
+
     public void FixedMove()
     {
         Vector3 movement = Vector3.zero;
@@ -18,5 +20,11 @@ public class GridPlayer : MonoBehaviour
 
         if (!Physics2D.OverlapPoint(transform.position + movement))
             transform.position += movement;
+    }
+
+    public void Move(Dir dir)
+    {
+        transform.position += dir.ToV3() * Controller.gridScale;
+        animator.SetInteger("Direction", (int)dir);
     }
 }

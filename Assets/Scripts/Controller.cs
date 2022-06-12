@@ -47,6 +47,7 @@ public class Controller : MonoBehaviour
     public const float gridScale = 0.5f;
     [Range(0.01f, 0.5f)]
     private const float relativeNodeRadius = 0.3f;
+    private const float minNumCellsForMove = 0.3f; //Number of cells from the center of the screen before a move will not count.
 
     [Header("Debug Controls")]
     public List<GameObject> tilePrefabs = new List<GameObject>();
@@ -241,8 +242,11 @@ public class Controller : MonoBehaviour
         {
             Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             Vector2 delta = mousePos - player.transform.position;
+            
+            if (DirectionTooCloseToCenter(delta))
+                return;
 
-            Vector3 move = DeltaToMove(delta) * gridScale;
+            Dir move = DeltaToDir(delta);
 
             if (MovePlayer(move))
             {
@@ -265,17 +269,20 @@ public class Controller : MonoBehaviour
         {
             Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             Vector2 delta = mousePos - player.transform.position;
-            
-            Vector3 move = DeltaToMove(delta) * gridScale;
+
+            if (DirectionTooCloseToCenter(delta))
+                return;
+
+            Dir move = DeltaToDir(delta);
 
             MovePlayer(move);
         }
     }
 
-    private bool MovePlayer(Vector3 movement)
+    private bool MovePlayer(Dir movement)
     {
-        if (NoCollisionAtPoint(player.transform.position + movement))
-            player.transform.position += movement;
+        if (NoCollisionAtPoint(player.transform.position + movement.ToV3() * gridScale))
+            player.Move(movement);
         else
             return false;
 
@@ -295,27 +302,52 @@ public class Controller : MonoBehaviour
         return !Physics2D.OverlapCircle(pos, gridScale * relativeNodeRadius, wallLayers);
     }
 
+    private bool DirectionTooCloseToCenter(Vector2 delta)
+    {
+        if (delta.sqrMagnitude > Mathf.Pow(gridScale * minNumCellsForMove, 2))
+            return false;
+
+        return true;
+    }
+
     private Vector2 DeltaToMove(Vector2 delta)
     {
         Vector2 move = Vector2.zero;
-
-        //If the tap was not too close to the origin
-        if (delta.sqrMagnitude > Mathf.Pow(gridScale * 3f, 2))
+        
+        if (delta.x > delta.y) //Right or Down
         {
-            if (delta.x > delta.y) //Right or Down
-            {
-                if (delta.x > -delta.y) //Right
-                    move = Vector2.right;
-                else //Down
-                    move = Vector2.down;
-            }
-            else //Up or Left
-            {
-                if (delta.x > -delta.y) //Up
-                    move = Vector2.up;
-                else //Left
-                    move = Vector2.left;
-            }
+            if (delta.x > -delta.y) //Right
+                move = Vector2.right;
+            else //Down
+                move = Vector2.down;
+        }
+        else //Up or Left
+        {
+            if (delta.x > -delta.y) //Up
+                move = Vector2.up;
+            else //Left
+                move = Vector2.left;
+        }
+        return move;
+    }
+
+    private Dir DeltaToDir(Vector2 delta)
+    {
+        Dir move = Dir.top;
+
+        if (delta.x > delta.y) //Right or Down
+        {
+            if (delta.x > -delta.y) //Right
+                move = Dir.right;
+            else //Down
+                move = Dir.bottom;
+        }
+        else //Up or Left
+        {
+            if (delta.x > -delta.y) //Up
+                move = Dir.top;
+            else //Left
+                move = Dir.left;
         }
         return move;
     }
@@ -1217,6 +1249,11 @@ public static class Utility
             return Vector2Int.left;
         else// if(dir == Dir.top)
             return Vector2Int.up;
+    }
+
+    public static Vector3 ToV3(this Dir dir)
+    {
+        return dir.ToV3();
     }
 
     public static Vector2 ToV2(this Dir dir)
