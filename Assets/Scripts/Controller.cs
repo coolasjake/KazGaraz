@@ -1253,7 +1253,7 @@ public static class Utility
 
     public static Vector3 ToV3(this Dir dir)
     {
-        return dir.ToV3();
+        return dir.ToV2();
     }
 
     public static Vector2 ToV2(this Dir dir)
