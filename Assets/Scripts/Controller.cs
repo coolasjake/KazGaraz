@@ -29,6 +29,7 @@ public class Controller : MonoBehaviour
     public LayerMask recordLayer;
     public bool startInMiddle = false;
     public bool giveTempoScore = false;
+    public float collectionSize = 2f;
 
     [Header("Music Settings")]
     public float musicBeatRate = 0.245942f;
@@ -270,13 +271,15 @@ public class Controller : MonoBehaviour
             Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             Vector2 delta = mousePos - player.transform.position;
 
-            if (DirectionTooCloseToCenter(delta))
+            if (!DirectionTooCloseToCenter(delta))
+            {
+                Dir move = DeltaToDir(delta);
+                MovePlayer(move);
                 return;
-
-            Dir move = DeltaToDir(delta);
-
-            MovePlayer(move);
+            }
         }
+
+        player.Idle();
     }
 
     private bool MovePlayer(Dir movement)
@@ -286,7 +289,7 @@ public class Controller : MonoBehaviour
         else
             return false;
 
-        Collider2D record = Physics2D.OverlapPoint(player.transform.position, recordLayer);
+        Collider2D record = Physics2D.OverlapCircle(player.transform.position, gridScale * collectionSize, recordLayer);
         if (record)
         {
             score += 100;

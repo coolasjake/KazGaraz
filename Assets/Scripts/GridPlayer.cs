@@ -27,4 +27,9 @@ public class GridPlayer : MonoBehaviour
         transform.position += dir.ToV3() * Controller.gridScale;
         animator.SetInteger("Direction", (int)dir);
     }
+
+    public void Idle()
+    {
+        animator.SetInteger("Direction", -1);
+    }
 }
