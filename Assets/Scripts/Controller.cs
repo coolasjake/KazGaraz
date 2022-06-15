@@ -30,6 +30,7 @@ public class Controller : MonoBehaviour
     public bool startInMiddle = false;
     public bool giveTempoScore = false;
     public float collectionSize = 2f;
+    public float enemySize = 2f;
 
     [Header("Music Settings")]
     public float musicBeatRate = 0.245942f;
@@ -368,7 +369,7 @@ public class Controller : MonoBehaviour
         {
             E.path = GetPathAStar(E.transform.position, player.transform.position);
             E.Move(player.transform.position);
-            if (Vector2.Distance(E.transform.position, player.transform.position) < gridScale)
+            if (Vector2.Distance(E.transform.position, player.transform.position) < gridScale * enemySize)
                 GameOver(false);
         }
     }
@@ -582,6 +583,17 @@ public class Controller : MonoBehaviour
                 connectionsMatrix[currentTile.x, currentTile.y][randomDir] = true;
             */
 
+            for (int dir = 0; dir < 4; ++dir)
+            {
+                if (connectionsMatrix[currentTile.x, currentTile.y][dir] == false)
+                {
+                    offset = currentTile + ((Dir)dir).ToOffset();
+                    if (offset.x < Chunk.Width && offset.x >= 0 &&
+                        offset.y < Chunk.Height && offset.y >= 0)
+                        connectionsMatrix[offset.x, offset.y][dir.OppositeDir()] = false;
+                }
+            }
+
             filledTiles[currentTile.x, currentTile.y] = true;
 
             //Move the currentTile pointer to the next slot in the path
@@ -608,7 +620,7 @@ public class Controller : MonoBehaviour
 
                         if (filledTiles[offset.x, offset.y] == false)
                             neededDirections[dir] = Random.value > 0.5f;
-                        else if (connectionsMatrix[offset.x, offset.y][dir.OppositeIfDir()])
+                        else if (connectionsMatrix[offset.x, offset.y][dir.OppositeDir()])
                             neededDirections[dir] = true;
                     }
                     connectionsMatrix[x, y] = neededDirections;
@@ -623,12 +635,14 @@ public class Controller : MonoBehaviour
         GenerateNodesForChunk(thisChunk);
 
         int numRecords = 0;
-        for (int i = 0; i < Chunk.Width * Chunk.Height * 5; ++i)
+        bool[,] filledNodes = new bool[SimpleTile.widthInCells * Chunk.Width, SimpleTile.heightInCells * Chunk.Height];
+        for (int i = 0; i < Chunk.Width * Chunk.Height * 5 + (numChunks * 10); ++i)
         {
             Vector2Int randomPos = new Vector2Int(Random.Range(0, SimpleTile.widthInCells * Chunk.Width), Random.Range(0, SimpleTile.heightInCells * Chunk.Height));
-            if (thisChunk.nodes[randomPos.x, randomPos.y] == true)
+            if (filledNodes[randomPos.x, randomPos.y] == false && thisChunk.nodes[randomPos.x, randomPos.y] == true)
             {
                 numRecords += 1;
+                filledNodes[randomPos.x, randomPos.y] = true;
                 Instantiate(recordPre, (Vector2)thisChunk.holder.position + (Vector2)randomPos * gridScale + Vector2.one * gridScale * 0.5f, Quaternion.identity, thisChunk.holder);
                 if (numRecords >= Chunk.Width * Chunk.Height)
                     break;
@@ -1244,7 +1258,7 @@ public static class Utility
         return (Dir)(((int)dir + 2) % 4);
     }
 
-    public static int OppositeIfDir(this int dir)
+    public static int OppositeDir(this int dir)
     {
         return (dir + 2) % 4;
     }
