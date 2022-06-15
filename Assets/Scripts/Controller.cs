@@ -500,7 +500,24 @@ public class Controller : MonoBehaviour
 
         FillChunkWithTiles(thisChunk, connectionsMatrix);
 
-        GenerateNodesForChunk(thisChunk);
+        if (zeroConnectionTiles.Count > 0)
+        {
+            GameObject blankTile = zeroConnectionTiles[0];
+
+            Vector2 tileSize = new Vector2(SimpleTile.widthInCells, SimpleTile.heightInCells) * gridScale;
+            Vector2 halfTile = new Vector2(SimpleTile.widthInCells * gridScale * 0.5f, SimpleTile.heightInCells * gridScale * 0.5f);
+            for (int y = 0 - Chunk.Height * maxChunks; y < Chunk.Height; ++y)
+            {
+                //Create two tiles on the left and two on the right
+                Vector2 tilePos = (new Vector2(-1, y)).MultipliedBy(tileSize) + (Vector2)thisChunk.holder.position + halfTile;
+                Instantiate(blankTile, tilePos, Quaternion.identity, thisChunk.holder).GetComponent<SimpleTile>();
+
+                tilePos = (new Vector2(Chunk.Width, y)).MultipliedBy(tileSize) + (Vector2)thisChunk.holder.position + halfTile;
+                Instantiate(blankTile, tilePos, Quaternion.identity, thisChunk.holder).GetComponent<SimpleTile>();
+
+                GenerateNodesForChunk(thisChunk);
+            }
+        }
 
         chunks.Add(thisChunk);
     }
@@ -622,7 +639,7 @@ public class Controller : MonoBehaviour
 
         if (chunks.Count > maxChunks + 1)
         {
-            Destroy(chunks[1].holder.gameObject);
+            Destroy(chunks[1].holder.gameObject, 0.01f);
             chunks.RemoveAt(1);
             chunks[0].holder.Translate(Vector2.down * Chunk.Height * SimpleTile.heightInCells * gridScale);
         }
@@ -896,16 +913,6 @@ public class Controller : MonoBehaviour
                 }
             }
         }
-        /*
-        for (int y = 0; y < chunk.nodes.GetLength(1); ++y)
-        {
-            for (int x = 0; x < chunk.nodes.GetLength(0); ++x)
-            {
-                if (chunk.nodes[x,y] == true && !HasPathAStar(chunk, new Vector2Int(x, y)))
-                    chunk.nodes[x, y] = false;
-            }
-        }
-        */
 
         chunk.bottomConnectNode = new Vector2Int(Mathf.FloorToInt((chunk.endSlot.x + 0.5f) * SimpleTile.widthInCells), 0);
         chunk.topConnectNode = new Vector2Int(Mathf.FloorToInt((chunk.startSlot.x + 0.5f) * SimpleTile.widthInCells), chunk.nodes.GetLength(1));
