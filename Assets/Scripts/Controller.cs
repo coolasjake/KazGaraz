@@ -836,6 +836,7 @@ public class Controller : MonoBehaviour
             return chosenTile;
 
         bool foundPerfectTile = false;
+        List<GameObject> perfectOptions = new List<GameObject>();
         foreach (SimpleTile tilePre in sortedTiles[entrance])
         {
             bool isAMatch = true;
@@ -851,7 +852,15 @@ public class Controller : MonoBehaviour
             }
 
             if (isAMatch)
-                return tilePre.gameObject;
+            {
+                perfectOptions.Add(tilePre.gameObject);
+                foundPerfectTile = true;
+            }
+        }
+        if (foundPerfectTile)
+        {
+            randomIndex = Random.Range(0, perfectOptions.Count);
+            return perfectOptions[randomIndex];
         }
 
         Debug.LogError("Couldn't find a tile that matches these connections:"
