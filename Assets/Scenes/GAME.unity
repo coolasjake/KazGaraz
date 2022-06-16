@@ -1631,6 +1631,8 @@ MonoBehaviour:
     m_Bits: 128
   startInMiddle: 0
   giveTempoScore: 0
+  collectionSize: 2
+  enemySize: 2
   musicBeatRate: 0.245942
   firstBeatTime: 0.22
   beatsBeforeEnemyMoves: 3
@@ -1638,8 +1640,8 @@ MonoBehaviour:
   beatsPerPlayerMove: 1
   beatsPerEnemyMove: 4
   enemyMovesOnOffBeats: 1
-  NumChunksForNewEnemies: 050000000a0000001400000028000000
-  NumBeatsForNewEnemies: 
+  NumChunksForNewEnemies: 
+  NumBeatsForNewEnemies: 2800000050000000a000000040010000
   tilePrefabs: []
   showPathfindingGizmos: 0
   showBeatsAnalysis: 0
