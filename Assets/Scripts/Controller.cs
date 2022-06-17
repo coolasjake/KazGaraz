@@ -424,7 +424,8 @@ public class Controller : MonoBehaviour
             if (numChunks >= nextChunkSpawn)
             {
                 NumChunksForNewEnemies.RemoveAt(0);
-                CreateEnemy(chunks[chunks.Count - 1].holder.position); //NEEDS IMPROVEMENT HERE
+                CreateEnemy((Vector2)chunks[chunks.Count - 1].bottomConnectNode * gridScale + (Vector2)chunks[chunks.Count - 1].holder.position); //NEEDS IMPROVEMENT HERE
+
             }
         }
     }
