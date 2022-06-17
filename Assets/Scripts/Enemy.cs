@@ -46,4 +46,9 @@ public class Enemy : MonoBehaviour
         }
         transform.position += move * Controller.gridScale;
     }
+
+    public void Idle()
+    {
+        animator.SetInteger("Direction", -1);
+    }
 }

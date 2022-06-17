@@ -159,12 +159,16 @@ public class Controller : MonoBehaviour
                 //Move on off-beats (all beats except first)
                 if (numBeats > 0 && beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove != 0)
                     MoveEnemies();
+                else
+                    IdleEnemies();
             }
             else
             {
                 //Move on main-beats (only first in set)
                 if (numBeats > 0 && beatsPerEnemyMove != 0 && numBeats % beatsPerEnemyMove == 0)
                     MoveEnemies();
+                else
+                    IdleEnemies();
             }
         }
 
@@ -371,6 +375,14 @@ public class Controller : MonoBehaviour
             E.Move(player.transform.position);
             if (Vector2.Distance(E.transform.position, player.transform.position) < gridScale * enemySize)
                 GameOver(false);
+        }
+    }
+
+    private void IdleEnemies()
+    {
+        foreach (Enemy E in enemies)
+        {
+            E.Idle();
         }
     }
 
