@@ -6,9 +6,10 @@ using UnityEngine.SceneManagement;
 
 public class Menu : MonoBehaviour
 {
-    public Text TapToPlay;
+    public Button TapToPlay;
     public Button EasyButton;
     public Button HardButton;
+    public Image Dim;
 
     private bool showingButtons = false;
 
@@ -18,6 +19,7 @@ public class Menu : MonoBehaviour
         EasyButton.onClick.AddListener(Easy);
         HardButton.onClick.AddListener(Hard);
 
+        Dim.gameObject.SetActive(false);
         EasyButton.gameObject.SetActive(false);
         HardButton.gameObject.SetActive(false);
     }
@@ -33,7 +35,7 @@ public class Menu : MonoBehaviour
             Color textCol = Color.white;
             float x = 0.5f + Mathf.PingPong(Time.time, 1) * 0.5f;
             textCol = Color.HSVToRGB(0, 0, x);
-            TapToPlay.color = textCol;
+          //  TapToPlay.color = textCol;
         }
     }
 
@@ -42,6 +44,7 @@ public class Menu : MonoBehaviour
         showingButtons = true;
 
         TapToPlay.gameObject.SetActive(false);
+        Dim.gameObject.SetActive(true);
         EasyButton.gameObject.SetActive(true);
         HardButton.gameObject.SetActive(true);
     }
