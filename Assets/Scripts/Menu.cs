@@ -6,10 +6,11 @@ using UnityEngine.SceneManagement;
 
 public class Menu : MonoBehaviour
 {
-    public Button TapToPlay;
+    public Image TapToPlay;
     public Button EasyButton;
     public Button HardButton;
     public Image Dim;
+    public string BandLink = "";
 
     private bool showingButtons = false;
 
@@ -29,17 +30,19 @@ public class Menu : MonoBehaviour
     {
         if (!showingButtons)
         {
-            if (Input.GetMouseButtonDown(0))
-                FirstTap();
-
-            Color textCol = Color.white;
+            Color playButtonCol = Color.white;
             float x = 0.5f + Mathf.PingPong(Time.time, 1) * 0.5f;
-            textCol = Color.HSVToRGB(0, 0, x);
-          //  TapToPlay.color = textCol;
+            playButtonCol = Color.HSVToRGB(0, 0, x);
+            TapToPlay.color = playButtonCol;
         }
     }
 
-    public void FirstTap()
+    public void Link()
+    {
+        Application.OpenURL(BandLink);
+    }
+
+    public void Play()
     {
         showingButtons = true;
 
