@@ -44,6 +44,7 @@ public class Controller : MonoBehaviour
 
     [Header("Enemy Spawning")]
     public List<int> NumChunksForNewEnemies = new List<int>();
+    public bool SpawnBeatEnemiesAtTop = true;
     public List<int> NumBeatsForNewEnemies = new List<int>();
 
     public const float gridScale = 0.5f;
@@ -150,7 +151,11 @@ public class Controller : MonoBehaviour
                 if (numBeats >= nextEnemySpawn)
                 {
                     NumBeatsForNewEnemies.RemoveAt(0);
-                    CreateEnemy(chunks[0].holder.position); //NEEDS IMPROVEMENT HERE
+                    if (SpawnBeatEnemiesAtTop)
+                        CreateEnemy((Vector2)chunks[2].topConnectNode * gridScale + (Vector2)chunks[chunks.Count - 1].holder.position);
+                    else
+                        CreateEnemy((Vector2)chunks[2].bottomConnectNode * gridScale + (Vector2)chunks[chunks.Count - 1].holder.position);
+                    //CreateEnemy(chunks[0].holder.position); //NEEDS IMPROVEMENT HERE
                 }
             }
 
@@ -425,7 +430,6 @@ public class Controller : MonoBehaviour
             {
                 NumChunksForNewEnemies.RemoveAt(0);
                 CreateEnemy((Vector2)chunks[chunks.Count - 1].bottomConnectNode * gridScale + (Vector2)chunks[chunks.Count - 1].holder.position); //NEEDS IMPROVEMENT HERE
-
             }
         }
     }
