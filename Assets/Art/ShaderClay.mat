@@ -14,7 +14,7 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
+  m_CustomRenderQueue: 2000
   stringTagMap: {}
   disabledShaderPasses: []
   m_SavedProperties:
@@ -24,23 +24,39 @@ Material:
         m_Texture: {fileID: 2800000, guid: ad9faeb8a087e4b41aa8cebd63ff7aa3, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_28b75d7b5f0c41d98c52787e9b6b7044_Texture_1:
+        m_Texture: {fileID: 2800000, guid: ad1697cba1e395c45abd70f8c3f8e03b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SampleTexture2D_2e7e0fa5f3dc46ceb7b5ddb205a04f82_Texture_1:
         m_Texture: {fileID: 2800000, guid: e124a6e3f5b5e4445b2ef5f9e3c84d60, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_341c68b7e4ff4b58a422575601c4bddf_Texture_1:
+        m_Texture: {fileID: 2800000, guid: ad9faeb8a087e4b41aa8cebd63ff7aa3, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SampleTexture2D_5aeeb9a2980240a398e428d7a62e4682_Texture_1:
         m_Texture: {fileID: 2800000, guid: ad1697cba1e395c45abd70f8c3f8e03b, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_96735bd42f744a708e3ac810151903f0_Texture_1:
+        m_Texture: {fileID: 2800000, guid: e124a6e3f5b5e4445b2ef5f9e3c84d60, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_e0b6cedeec054e3daafeb09887623428_Texture_1:
+        m_Texture: {fileID: 2800000, guid: 2127a0a258ecc294ba040d8799db7880, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _BUILTIN_QueueControl: 0
     - _BUILTIN_QueueOffset: 0
-    - _EdgePower: 13.44
-    - _ShadowPower: 10.63
-    - _Strengh: 18.92
+    - _EdgePower: 7.1
+    - _ShadowPower: 3.18
+    - _Strengh: 7.7
     m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 0}
+    - _Color: {r: 1, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
 --- !u!114 &3458419114034830413
 MonoBehaviour:
