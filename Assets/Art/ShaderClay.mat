@@ -53,10 +53,15 @@ Material:
     - _BUILTIN_QueueControl: 0
     - _BUILTIN_QueueOffset: 0
     - _EdgePower: 7.1
+    - _LoopTime: 0.983768
+    - _NormalIntensity: 0.5
     - _ShadowPower: 3.18
     - _Strengh: 7.7
+    - _UseTime: 0
     m_Colors:
     - _Color: {r: 1, g: 0, b: 0, a: 0}
+    - _NormalValues: {r: 1, g: 1, b: 0.5, a: 0}
+    - _VertexPos: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
 --- !u!114 &3458419114034830413
 MonoBehaviour:
