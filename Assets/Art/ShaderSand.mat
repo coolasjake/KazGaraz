@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-4277971825941106441
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 639247ca83abc874e893eb93af2b5e44, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 0
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ShaderSand
+  m_Shader: {fileID: -6465566751694194690, guid: 34cb6847ce2613f47a079dc063d9bbbe, type: 3}
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _SampleTexture2D_00862765e67e41619f05df2c9716a8e1_Texture_1:
+        m_Texture: {fileID: 2800000, guid: 10f5105660c5e7444a5c5eb5acbda4b3, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_33b2b1bab0194956be1e70e4b644d2ad_Texture_1:
+        m_Texture: {fileID: 2800000, guid: 6e0b77eb3e8bcc34384da84794f91a1f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_72915e1b2f3547238aa8db8332b5f557_Texture_1:
+        m_Texture: {fileID: 2800000, guid: c883b7aebab4f39499cb7f6b3871b926, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_91b4b7796b354e768c96879bdfb3b07a_Texture_1:
+        m_Texture: {fileID: 2800000, guid: 3a23ec9332f7fb449bfa483448e3ab2b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BUILTIN_QueueControl: 0
+    - _BUILTIN_QueueOffset: 0
+    m_Colors: []
+  m_BuildTextureStacks: []
