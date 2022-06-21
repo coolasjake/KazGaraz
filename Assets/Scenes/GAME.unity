@@ -1827,6 +1827,15 @@ MonoBehaviour:
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
+      time: 1.0400503
+      value: 2.1738205
+      inSlope: 3.4877455
+      outSlope: 3.4877455
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.045499586
+    - serializedVersion: 3
       time: 8
       value: 10
       inSlope: 0
@@ -1857,6 +1866,7 @@ MonoBehaviour:
   beatsPerEnemyMove: 4
   enemyMovesOnOffBeats: 1
   NumChunksForNewEnemies: 
+  SpawnBeatEnemiesAtTop: 0
   NumBeatsForNewEnemies: 2800000050000000a000000040010000
   tilePrefabs: []
   showPathfindingGizmos: 0

@@ -152,9 +152,9 @@ public class Controller : MonoBehaviour
                 {
                     NumBeatsForNewEnemies.RemoveAt(0);
                     if (SpawnBeatEnemiesAtTop)
-                        CreateEnemy((Vector2)chunks[2].topConnectNode * gridScale + (Vector2)chunks[chunks.Count - 1].holder.position);
+                        CreateEnemy((Vector2)chunks[1].topConnectNode * gridScale + (Vector2)chunks[chunks.Count - 1].holder.position);
                     else
-                        CreateEnemy((Vector2)chunks[2].bottomConnectNode * gridScale + (Vector2)chunks[chunks.Count - 1].holder.position);
+                        CreateEnemy((Vector2)chunks[1].bottomConnectNode * gridScale + (Vector2)chunks[chunks.Count - 1].holder.position);
                     //CreateEnemy(chunks[0].holder.position); //NEEDS IMPROVEMENT HERE
                 }
             }
