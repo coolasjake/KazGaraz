@@ -51,6 +51,7 @@ public class Controller : MonoBehaviour
     [Range(0.01f, 0.5f)]
     private const float relativeNodeRadius = 0.3f;
     private const float minNumCellsForMove = 0.3f; //Number of cells from the center of the screen before a move will not count.
+    public float wakeUpRadius = 0.3f;
 
     [Header("Debug Controls")]
     public List<GameObject> tilePrefabs = new List<GameObject>();
@@ -80,6 +81,7 @@ public class Controller : MonoBehaviour
     private List<Vector2> downConnections = new List<Vector2>();
 
     private List<Enemy> enemies = new List<Enemy>();
+    private List<Enemy> idleEnemies = new List<Enemy>();
 
     public float score = 0;
     #endregion
@@ -372,6 +374,13 @@ public class Controller : MonoBehaviour
         enemies.Add(newEnemy);
     }
 
+    private void CreateIdleEnemy(Vector2 position)
+    {
+        GameObject GO = Instantiate(enemyPrefab, position, Quaternion.identity);
+        Enemy newEnemy = GO.GetComponent<Enemy>();
+        idleEnemies.Add(newEnemy);
+    }
+
     private void MoveEnemies()
     {
         foreach (Enemy E in enemies)
@@ -380,6 +389,21 @@ public class Controller : MonoBehaviour
             E.Move(player.transform.position);
             if (Vector2.Distance(E.transform.position, player.transform.position) < gridScale * enemySize)
                 GameOver(false);
+        }
+        for (int i = 0; i < idleEnemies.Count; ++i)
+        {
+            if (idleEnemies[i].transform.position.y > chunks[0].holder.position.y)
+            {
+                Destroy(idleEnemies[i].gameObject);
+                idleEnemies.RemoveAt(i);
+                --i;
+            }
+            else if (Vector2.Distance(idleEnemies[i].transform.position, player.transform.position) < wakeUpRadius)
+            {
+                enemies.Add(idleEnemies[i]);
+                idleEnemies.RemoveAt(i);
+                --i;
+            }
         }
     }
 
@@ -516,7 +540,7 @@ public class Controller : MonoBehaviour
         connectionsMatrix[startingTile, 1][(int)Dir.top] = true;
         connectionsMatrix[startingTile, 2][(int)Dir.bottom] = true;
 
-        FillChunkWithTiles(thisChunk, connectionsMatrix);
+        FillChunkWithTilesAndEnemies(thisChunk, connectionsMatrix, 0);
 
         if (zeroConnectionTiles.Count > 0)
         {
@@ -647,7 +671,7 @@ public class Controller : MonoBehaviour
         }
         #endregion
 
-        FillChunkWithTiles(thisChunk, connectionsMatrix);
+        FillChunkWithTilesAndEnemies(thisChunk, connectionsMatrix, Mathf.Min(numChunks, 3));
 
         GenerateNodesForChunk(thisChunk);
 
@@ -815,10 +839,12 @@ public class Controller : MonoBehaviour
         return path.ToArray();
     }
 
-    private void FillChunkWithTiles(Chunk thisChunk, bool[,][] connections)
+    private void FillChunkWithTilesAndEnemies(Chunk thisChunk, bool[,][] connections, int numEnemies)
     {
         Vector2 tileSize = new Vector2(SimpleTile.widthInCells, SimpleTile.heightInCells) * gridScale;
         Vector2 halfTile = new Vector2(SimpleTile.widthInCells * gridScale * 0.5f, SimpleTile.heightInCells * gridScale * 0.5f);
+
+        List<Vector2> deadEndTiles = new List<Vector2>();
 
         for (int x = 0; x < connections.GetLength(0); ++x)
         {
@@ -831,6 +857,28 @@ public class Controller : MonoBehaviour
 
                 SimpleTile newTile = Instantiate(chosenTile, tilePos, Quaternion.identity, thisChunk.holder).GetComponent<SimpleTile>();
                 thisChunk.slots[x, y] = newTile;
+
+                int numEntrances = 0;
+                for (int dir = 0; dir < 4; ++dir)
+                {
+                    if (connections[x,y][dir])
+                        ++numEntrances;
+                }
+
+                if (numEntrances == 1)
+                {
+                    deadEndTiles.Add(tilePos);
+                }
+            }
+        }
+
+        for (int i = 0; i < numEnemies; ++i)
+        {
+            if (deadEndTiles.Count > 0)
+            {
+                int randomOption = Random.Range(0, deadEndTiles.Count);
+                CreateIdleEnemy(deadEndTiles[randomOption]);
+                deadEndTiles.RemoveAt(randomOption);
             }
         }
     }
