@@ -6,6 +6,7 @@ public class GridPlayer : MonoBehaviour
 {
     public Animator animator;
     public LayerMask recordLayer;
+    public GameObject recordPickup;
     public float collectionSize = 2f;
 
     public void FixedMove()
@@ -29,8 +30,10 @@ public class GridPlayer : MonoBehaviour
         Collider2D record = Physics2D.OverlapCircle(transform.position, Controller.gridScale * collectionSize, recordLayer);
         if (record)
         {
+            Instantiate(recordPickup, transform.position, transform.rotation);
             Destroy(record.gameObject);
             return true;
+
         }
         return false;
     }
