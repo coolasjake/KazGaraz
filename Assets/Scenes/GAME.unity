@@ -733,6 +733,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   animator: {fileID: 244264024}
+  recordLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  collectionSize: 2
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -1635,12 +1639,8 @@ MonoBehaviour:
   wallLayers:
     serializedVersion: 2
     m_Bits: 1
-  recordLayer:
-    serializedVersion: 2
-    m_Bits: 128
   startInMiddle: 0
   giveTempoScore: 0
-  collectionSize: 2
   enemySize: 2
   musicBeatRate: 0.245942
   firstBeatTime: 0.22

@@ -26,10 +26,8 @@ public class Controller : MonoBehaviour
     [Min(3)]
     public int maxChunks = 3;
     public LayerMask wallLayers;
-    public LayerMask recordLayer;
     public bool startInMiddle = false;
     public bool giveTempoScore = false;
-    public float collectionSize = 2f;
     public float enemySize = 2f;
 
     [Header("Music Settings")]
@@ -300,13 +298,11 @@ public class Controller : MonoBehaviour
             player.Move(movement);
         else
             return false;
-
-        Collider2D record = Physics2D.OverlapCircle(player.transform.position, gridScale * collectionSize, recordLayer);
-        if (record)
+        
+        if (player.CheckForRecord())
         {
             score += 100;
             scoreText.text = score.ToString();
-            Destroy(record.gameObject);
         }
 
         return true;

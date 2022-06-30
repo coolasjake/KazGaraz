@@ -5,6 +5,8 @@ using UnityEngine;
 public class GridPlayer : MonoBehaviour
 {
     public Animator animator;
+    public LayerMask recordLayer;
+    public float collectionSize = 2f;
 
     public void FixedMove()
     {
@@ -20,6 +22,17 @@ public class GridPlayer : MonoBehaviour
 
         if (!Physics2D.OverlapPoint(transform.position + movement))
             transform.position += movement;
+    }
+
+    public bool CheckForRecord()
+    {
+        Collider2D record = Physics2D.OverlapCircle(transform.position, Controller.gridScale * collectionSize, recordLayer);
+        if (record)
+        {
+            Destroy(record.gameObject);
+            return true;
+        }
+        return false;
     }
 
     public void Move(Dir dir)
