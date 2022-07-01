@@ -30,7 +30,7 @@ public class GridPlayer : MonoBehaviour
         Collider2D record = Physics2D.OverlapCircle(transform.position, Controller.gridScale * collectionSize, recordLayer);
         if (record)
         {
-            Instantiate(recordPickup, transform.position, transform.rotation);
+            Instantiate(recordPickup, record.transform.position, Quaternion.identity);
             Destroy(record.gameObject);
             return true;
 

@@ -75,7 +75,6 @@ public class Controller : MonoBehaviour
     private int numBeats = 0;
     private AudioSource musicPlayer;
 
-    private List<Tile[]> generatedTiles = new List<Tile[]>();
     private List<Vector2> downConnections = new List<Vector2>();
 
     private List<Enemy> enemies = new List<Enemy>();
