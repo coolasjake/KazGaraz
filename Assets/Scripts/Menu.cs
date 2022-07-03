@@ -10,6 +10,8 @@ public class Menu : MonoBehaviour
     public Button EasyButton;
     public Button HardButton;
     public Image Dim;
+    public Image AlbumGlow;
+    public GameObject IntroPlayer;
     public string BandLink = "";
 
     private bool showingButtons = false;
@@ -23,6 +25,8 @@ public class Menu : MonoBehaviour
         Dim.gameObject.SetActive(false);
         EasyButton.gameObject.SetActive(false);
         HardButton.gameObject.SetActive(false);
+
+        //DontDestroyOnLoad(IntroPlayer);
     }
 
     // Update is called once per frame
@@ -34,6 +38,9 @@ public class Menu : MonoBehaviour
             float x = 0.5f + Mathf.PingPong(Time.time, 1) * 0.5f;
             playButtonCol = Color.HSVToRGB(0, 0, x);
             TapToPlay.color = playButtonCol;
+            Color glowCol = AlbumGlow.color;
+            glowCol.a = 0 + Mathf.PingPong(Time.time, 2) * 0.2f;
+            AlbumGlow.color = glowCol;
         }
     }
 

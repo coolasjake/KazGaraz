@@ -2,12 +2,22 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent(typeof(AudioSource))]
 public class GridPlayer : MonoBehaviour
 {
     public Animator animator;
     public LayerMask recordLayer;
     public GameObject recordPickup;
     public float collectionSize = 2f;
+
+    public List<AudioClip> pickupSounds = new List<AudioClip>();
+    public AudioSource audioPlayer;
+
+    void Start()
+    {
+        if (audioPlayer == null)
+            audioPlayer = GetComponent<AudioSource>();
+    }
 
     public void FixedMove()
     {
@@ -32,8 +42,12 @@ public class GridPlayer : MonoBehaviour
         {
             Instantiate(recordPickup, record.transform.position, Quaternion.identity);
             Destroy(record.gameObject);
+            if (pickupSounds.Count > 0)
+            {
+                audioPlayer.clip = pickupSounds[Random.Range(0, pickupSounds.Count)];
+                audioPlayer.Play();
+            }
             return true;
-
         }
         return false;
     }
